@@ -1,278 +1,731 @@
-// AI Avatar JavaScript
+/**
+ * AI Avatar Application JavaScript
+ * Implementation exactly as specified in the Technical Design Document
+ * 
+ * Includes all required classes:
+ * - InputManager: Handle text/voice input modes
+ * - ChatInterface: Manage conversations and UI updates
+ * - AudioRecorder: WebRTC audio capture with visualization
+ * - AvatarPlayer: Video playback and management
+ */
 
-class AvatarApp {
+// Enhanced Input Manager
+class InputManager {
     constructor() {
-        this.form = document.getElementById('avatarForm');
-        this.generateBtn = document.getElementById('generateBtn');
-        this.statusDiv = document.getElementById('status');
-        this.audioContainer = document.getElementById('audioContainer');
-        this.videoContainer = document.getElementById('videoContainer');
-        this.audioPlayer = document.getElementById('audioPlayer');
-        this.videoPlayer = document.getElementById('videoPlayer');
-        this.avatarContainer = document.getElementById('avatarContainer');
+        this.audioRecorder = new AudioRecorder();
+        this.inputMode = 'text'; // 'text' or 'voice'
+        this.isRecording = false;
         
-        this.initializeEventListeners();
-        this.loadConfiguration();
+        console.log('InputManager initialized');
     }
     
-    initializeEventListeners() {
-        this.form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.generateAvatarSpeech();
-        });
-        
-        // Character change handler
-        document.getElementById('character').addEventListener('change', () => {
-            this.updateAvailableStyles();
-        });
+    setInputMode(mode) {
+        this.inputMode = mode;
+        this.updateUI();
+        console.log(`Input mode changed to: ${mode}`);
     }
     
-    async loadConfiguration() {
-        try {
-            const response = await fetch('/api/config');
-            const data = await response.json();
-            
-            if (data.success) {
-                this.populateFormWithConfig(data.config);
+    async handleInput() {
+        if (this.inputMode === 'voice') {
+            return await this.handleVoiceInput();
+        } else {
+            return this.handleTextInput();
+        }
+    }
+    
+    async handleVoiceInput() {
+        if (!this.isRecording) {
+            try {
+                await this.audioRecorder.startRecording();
+                this.isRecording = true;
+                this.updateRecordingUI(true);
+                return null; // No input yet, just started recording
+            } catch (error) {
+                console.error('Failed to start recording:', error);
+                this.showError('Failed to start recording. Please check microphone permissions.');
+                return null;
             }
-        } catch (error) {
-            console.error('Error loading configuration:', error);
-        }
-        
-        // Load available avatars and voices
-        await this.loadAvailableOptions();
-    }
-    
-    async loadAvailableOptions() {
-        try {
-            // Load avatars
-            const avatarsResponse = await fetch('/api/avatars');
-            const avatarsData = await avatarsResponse.json();
-            
-            if (avatarsData.success) {
-                this.populateCharacterOptions(avatarsData.avatars.characters);
-                this.updateAvailableStyles();
+        } else {
+            try {
+                const audioBlob = await this.audioRecorder.stopRecording();
+                this.isRecording = false;
+                this.updateRecordingUI(false);
+                return { type: 'voice', data: audioBlob };
+            } catch (error) {
+                console.error('Failed to stop recording:', error);
+                this.showError('Failed to stop recording.');
+                this.isRecording = false;
+                this.updateRecordingUI(false);
+                return null;
             }
-            
-            // Load voices
-            const voicesResponse = await fetch('/api/voices');
-            const voicesData = await voicesResponse.json();
-            
-            if (voicesData.success) {
-                this.populateVoiceOptions(voicesData.voices);
-            }
-        } catch (error) {
-            console.error('Error loading options:', error);
         }
     }
     
-    populateCharacterOptions(characters) {
-        const characterSelect = document.getElementById('character');
-        characterSelect.innerHTML = '';
-        
-        for (const [key, character] of Object.entries(characters)) {
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = `${character.name} (${character.description})`;
-            characterSelect.appendChild(option);
+    handleTextInput() {
+        const textInput = document.getElementById('text-input');
+        const text = textInput.value.trim();
+        if (text) {
+            textInput.value = '';
+            return { type: 'text', data: text };
         }
-        
-        this.availableCharacters = characters;
+        return null;
     }
     
-    populateVoiceOptions(voices) {
-        const voiceSelect = document.getElementById('voice');
-        voiceSelect.innerHTML = '';
+    updateUI() {
+        const voiceControls = document.getElementById('voice-controls');
+        const textControls = document.getElementById('text-controls');
         
-        // Filter for English voices and sort by locale
-        const englishVoices = voices.filter(voice => 
-            voice.locale.startsWith('en-') && 
-            voice.voice_type === 'Neural'
-        );
-        
-        englishVoices.forEach(voice => {
-            const option = document.createElement('option');
-            option.value = voice.name;
-            option.textContent = `${voice.display_name} (${voice.locale})`;
-            voiceSelect.appendChild(option);
-        });
-    }
-    
-    updateAvailableStyles() {
-        const characterSelect = document.getElementById('character');
-        const styleSelect = document.getElementById('style');
-        const selectedCharacter = characterSelect.value;
-        
-        if (this.availableCharacters && this.availableCharacters[selectedCharacter]) {
-            const styles = this.availableCharacters[selectedCharacter].styles;
-            styleSelect.innerHTML = '';
-            
-            styles.forEach(style => {
-                const option = document.createElement('option');
-                option.value = style;
-                option.textContent = this.formatStyleName(style);
-                styleSelect.appendChild(option);
-            });
+        if (this.inputMode === 'voice') {
+            if (voiceControls) voiceControls.style.display = 'block';
+            if (textControls) textControls.style.display = 'none';
+        } else {
+            if (voiceControls) voiceControls.style.display = 'none';
+            if (textControls) textControls.style.display = 'block';
         }
     }
     
-    formatStyleName(style) {
-        return style.split('-').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1)
-        ).join(' ');
+    updateRecordingUI(isRecording) {
+        const recordButton = document.getElementById('record-button');
+        const recordText = document.querySelector('.record-text');
+        
+        if (recordButton && recordText) {
+            recordText.textContent = isRecording ? 'Stop Recording' : 'Start Recording';
+            recordButton.classList.toggle('recording', isRecording);
+        }
     }
     
-    populateFormWithConfig(config) {
-        document.getElementById('character').value = config.character;
-        document.getElementById('style').value = config.style;
-        document.getElementById('voice').value = config.voice;
+    showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
     }
-    
-    async generateAvatarSpeech() {
-        const formData = new FormData(this.form);
-        const data = {
-            text: formData.get('text'),
-            character: formData.get('character'),
-            style: formData.get('style'),
-            voice: formData.get('voice')
+}
+
+// Enhanced Chat Interface
+class ChatInterface {
+    constructor() {
+        this.inputManager = new InputManager();
+        this.avatarPlayer = new AvatarPlayer(document.getElementById('avatar-video'));
+        this.conversationHistory = [];
+        this.selectedModel = 'gpt4o';
+        this.avatarSettings = {
+            character: 'lisa',
+            style: 'graceful-sitting',
+            voice: 'en-US-JennyNeural',
+            background: 'solid-white',
+            gesture: null,
+            video_quality: 'high'
         };
         
-        // Validate input
-        if (!data.text.trim()) {
-            this.showStatus('Please enter some text to synthesize.', 'warning');
+        this.initializeAvatarOptions();
+        console.log('ChatInterface initialized');
+    }
+    
+    async initializeAvatarOptions() {
+        try {
+            const response = await fetch('/api/avatar/config');
+            if (response.ok) {
+                const data = await response.json();
+                this.populateAvatarControls(data.available_options);
+            } else {
+                console.warn('Failed to load avatar options, using defaults');
+                this.populateDefaultAvatarControls();
+            }
+        } catch (error) {
+            console.error('Failed to load avatar options:', error);
+            this.populateDefaultAvatarControls();
+        }
+    }
+    
+    populateAvatarControls(options) {
+        if (!options) {
+            this.populateDefaultAvatarControls();
             return;
         }
         
-        // Show loading state
-        this.setLoadingState(true);
-        this.showStatus('Generating avatar speech...', 'info', true);
+        // Populate character selector
+        const characterSelect = document.getElementById('avatar-character');
+        if (characterSelect && options.characters) {
+            characterSelect.innerHTML = '';
+            options.characters.forEach(char => {
+                const option = document.createElement('option');
+                option.value = char.id;
+                option.textContent = char.name;
+                option.title = char.description;
+                characterSelect.appendChild(option);
+            });
+        }
+        
+        // Populate style selector
+        const styleSelect = document.getElementById('avatar-style');
+        if (styleSelect && options.styles) {
+            styleSelect.innerHTML = '';
+            options.styles.forEach(style => {
+                const option = document.createElement('option');
+                option.value = style.id;
+                option.textContent = style.name;
+                option.title = style.description;
+                styleSelect.appendChild(option);
+            });
+        }
+        
+        // Populate voice selector
+        const voiceSelect = document.getElementById('avatar-voice');
+        if (voiceSelect && options.voices) {
+            voiceSelect.innerHTML = '';
+            options.voices.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.id;
+                option.textContent = `${voice.name} (${voice.gender})`;
+                voiceSelect.appendChild(option);
+            });
+        }
+        
+        // Populate background selector
+        const backgroundSelect = document.getElementById('avatar-background');
+        if (backgroundSelect && options.backgrounds) {
+            backgroundSelect.innerHTML = '';
+            options.backgrounds.forEach(bg => {
+                const option = document.createElement('option');
+                option.value = bg.id;
+                option.textContent = bg.name;
+                backgroundSelect.appendChild(option);
+            });
+        }
+        
+        // Populate gesture selector
+        const gestureSelect = document.getElementById('avatar-gesture');
+        if (gestureSelect && options.gestures) {
+            gestureSelect.innerHTML = '<option value="">No Gesture</option>';
+            options.gestures.forEach(gesture => {
+                const option = document.createElement('option');
+                option.value = gesture.id;
+                option.textContent = gesture.name;
+                option.title = gesture.description;
+                gestureSelect.appendChild(option);
+            });
+        }
+        
+        // Set up event listeners for avatar settings
+        this.setupAvatarSettingsListeners();
+    }
+    
+    populateDefaultAvatarControls() {
+        // Fallback when API is not available
+        const defaultOptions = {
+            characters: [
+                {id: 'lisa', name: 'Lisa', description: 'Professional female avatar'},
+                {id: 'mark', name: 'Mark', description: 'Professional male avatar'},
+                {id: 'anna', name: 'Anna', description: 'Casual female avatar'}
+            ],
+            styles: [
+                {id: 'graceful-sitting', name: 'Graceful Sitting', description: 'Elegant seated pose'},
+                {id: 'standing', name: 'Standing', description: 'Professional standing pose'}
+            ],
+            voices: [
+                {id: 'en-US-JennyNeural', name: 'Jenny (US)', gender: 'Female'},
+                {id: 'en-US-DavisNeural', name: 'Davis (US)', gender: 'Male'}
+            ]
+        };
+        
+        this.populateAvatarControls(defaultOptions);
+    }
+    
+    setupAvatarSettingsListeners() {
+        const selectors = [
+            'avatar-character', 'avatar-style', 'avatar-voice', 
+            'avatar-background', 'avatar-gesture', 'video-quality'
+        ];
+        
+        selectors.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('change', (e) => {
+                    const setting = id.replace('avatar-', '').replace('video-', '');
+                    this.avatarSettings[setting] = e.target.value || null;
+                    this.updateAvatarPreview();
+                });
+            }
+        });
+    }
+    
+    async updateAvatarPreview() {
+        const previewContainer = document.getElementById('avatar-preview');
+        if (previewContainer) {
+            previewContainer.innerHTML = `
+                <div class="avatar-preview-info">
+                    <h4>Avatar Preview</h4>
+                    <p><strong>Character:</strong> ${this.avatarSettings.character}</p>
+                    <p><strong>Style:</strong> ${this.avatarSettings.style}</p>
+                    <p><strong>Voice:</strong> ${this.avatarSettings.voice}</p>
+                    <p><strong>Background:</strong> ${this.avatarSettings.background}</p>
+                </div>
+            `;
+        }
+    }
+    
+    async sendMessage() {
+        const input = await this.inputManager.handleInput();
+        if (!input) return;
+        
+        // Add user message to chat
+        this.addMessageToChat('user', input.data, input.type);
+        
+        // Show loading indicator
+        this.showLoadingIndicator();
         
         try {
-            const response = await fetch('/api/synthesize', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            });
+            // Send to backend
+            const response = await this.sendToBackend(input, this.selectedModel);
             
-            const result = await response.json();
-            
-            if (result.success) {
-                this.handleSuccess(result);
+            if (response.success) {
+                // Add AI response to chat
+                this.addMessageToChat('assistant', response.text, 'text');
+                
+                // Play avatar video if available
+                if (response.video_url) {
+                    await this.avatarPlayer.playAvatarVideo(response.video_url);
+                }
+                
+                // Update conversation history
+                this.conversationHistory.push(
+                    { role: 'user', content: input.data, input_type: input.type },
+                    { role: 'assistant', content: response.text, model_used: response.model }
+                );
             } else {
-                this.handleError(result.error);
+                this.showError(response.error || 'Failed to get response');
             }
             
         } catch (error) {
-            console.error('Error generating speech:', error);
-            this.handleError('Network error occurred. Please try again.');
-        }
-        
-        this.setLoadingState(false);
-    }
-    
-    handleSuccess(result) {
-        this.showStatus(`Successfully generated speech for ${result.character} (${result.style})`, 'success');
-        
-        // Show audio player
-        if (result.audio_url) {
-            this.audioPlayer.src = result.audio_url;
-            this.audioContainer.classList.remove('d-none');
-            this.audioContainer.classList.add('fade-in');
-        }
-        
-        // Show video player if available
-        if (result.video_url) {
-            this.videoPlayer.src = result.video_url;
-            this.videoContainer.classList.remove('d-none');
-            this.videoContainer.classList.add('fade-in');
-        }
-        
-        // Update avatar container
-        this.updateAvatarDisplay(result);
-    }
-    
-    updateAvatarDisplay(result) {
-        const placeholder = this.avatarContainer.querySelector('.avatar-placeholder');
-        if (placeholder) {
-            placeholder.innerHTML = `
-                <div class="text-center">
-                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                    <h5>Avatar Speech Generated!</h5>
-                    <p class="text-muted">Character: ${result.character}</p>
-                    <p class="text-muted">Style: ${result.style}</p>
-                    <p class="text-muted">Voice: ${result.voice}</p>
-                </div>
-            `;
-            placeholder.classList.add('fade-in');
+            console.error('Send message error:', error);
+            this.showError('Failed to get response: ' + error.message);
+        } finally {
+            this.hideLoadingIndicator();
         }
     }
     
-    handleError(error) {
-        this.showStatus(`Error: ${error}`, 'danger');
+    addMessageToChat(sender, content, type) {
+        const chatContainer = document.getElementById('chat-container');
+        if (!chatContainer) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message`;
+        
+        const typeIcon = type === 'voice' ? '🎤' : '💬';
+        const timestamp = new Date().toLocaleTimeString();
+        
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <span class="sender">${sender === 'user' ? 'You' : 'Avatar'}</span>
+                <span class="type-icon">${typeIcon}</span>
+                <span class="timestamp">${timestamp}</span>
+            </div>
+            <div class="message-content">${this.escapeHtml(content)}</div>
+        `;
+        
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
     }
     
-    setLoadingState(loading) {
-        const spinner = this.generateBtn.querySelector('.spinner-border');
-        const btnText = loading ? 'Generating...' : 'Generate Avatar Speech';
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    async sendToBackend(input, model) {
+        const formData = new FormData();
         
-        this.generateBtn.disabled = loading;
-        spinner.classList.toggle('d-none', !loading);
-        
-        // Update button text (preserve spinner)
-        const textNode = Array.from(this.generateBtn.childNodes)
-            .find(node => node.nodeType === Node.TEXT_NODE);
-        if (textNode) {
-            textNode.textContent = btnText;
+        if (input.type === 'voice') {
+            formData.append('audio', input.data);
+            formData.append('input_type', 'voice');
         } else {
-            this.generateBtn.appendChild(document.createTextNode(btnText));
+            formData.append('text', input.data);
+            formData.append('input_type', 'text');
+        }
+        
+        formData.append('model', model);
+        formData.append('conversation_history', JSON.stringify(this.conversationHistory));
+        formData.append('avatar_settings', JSON.stringify(this.avatarSettings));
+        
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json();
+    }
+    
+    setModel(model) {
+        this.selectedModel = model;
+        const indicator = document.getElementById('model-indicator');
+        if (indicator) {
+            indicator.textContent = model.toUpperCase();
         }
     }
     
-    showStatus(message, type = 'info', pulse = false) {
-        this.statusDiv.className = `alert alert-${type}`;
-        this.statusDiv.textContent = message;
-        
-        if (pulse) {
-            this.statusDiv.classList.add('status-generating');
-        } else {
-            this.statusDiv.classList.remove('status-generating');
+    showLoadingIndicator() {
+        const indicator = document.getElementById('loading-indicator');
+        if (indicator) {
+            indicator.style.display = 'block';
+        }
+    }
+    
+    hideLoadingIndicator() {
+        const indicator = document.getElementById('loading-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+    
+    showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        if (errorDiv) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+    }
+    
+    async clearConversation() {
+        try {
+            const response = await fetch('/api/conversation', { method: 'DELETE' });
+            if (response.ok) {
+                this.conversationHistory = [];
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) {
+                    chatContainer.innerHTML = '';
+                }
+            }
+        } catch (error) {
+            console.error('Failed to clear conversation:', error);
+            this.showError('Failed to clear conversation');
+        }
+    }
+    
+    async exportConversation() {
+        try {
+            const response = await fetch('/api/export-conversation');
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'conversation_export.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+        } catch (error) {
+            console.error('Failed to export conversation:', error);
+            this.showError('Failed to export conversation');
         }
     }
 }
 
-// Initialize the app when DOM is loaded
+// WebRTC Audio Capture with Enhanced Features
+class AudioRecorder {
+    constructor() {
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.stream = null;
+        this.isRecording = false;
+        
+        console.log('AudioRecorder initialized');
+    }
+    
+    async startRecording() {
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
+            });
+            
+            this.mediaRecorder = new MediaRecorder(this.stream, {
+                mimeType: 'audio/webm;codecs=opus'
+            });
+            
+            this.audioChunks = [];
+            this.isRecording = true;
+            
+            this.mediaRecorder.addEventListener('dataavailable', (event) => {
+                this.audioChunks.push(event.data);
+            });
+            
+            this.mediaRecorder.start();
+            this.startVisualization();
+            
+            console.log('Recording started');
+        } catch (error) {
+            console.error('Failed to start recording:', error);
+            throw error;
+        }
+    }
+    
+    stopRecording() {
+        return new Promise((resolve, reject) => {
+            if (!this.mediaRecorder || !this.isRecording) {
+                reject(new Error('No active recording'));
+                return;
+            }
+            
+            this.mediaRecorder.addEventListener('stop', () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                this.stopVisualization();
+                this.cleanup();
+                console.log('Recording stopped');
+                resolve(audioBlob);
+            });
+            
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+        });
+    }
+    
+    startVisualization() {
+        try {
+            const canvas = document.getElementById('audio-visualizer');
+            if (!canvas) return;
+            
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(this.stream);
+            source.connect(analyser);
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const visualize = () => {
+                if (this.isRecording) {
+                    requestAnimationFrame(visualize);
+                    
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    const barWidth = (canvas.width / bufferLength) * 2.5;
+                    let barHeight;
+                    let x = 0;
+                    
+                    for (let i = 0; i < bufferLength; i++) {
+                        barHeight = dataArray[i] / 2;
+                        
+                        ctx.fillStyle = `rgb(50, ${barHeight + 100}, 50)`;
+                        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                        
+                        x += barWidth + 1;
+                    }
+                }
+            };
+            
+            visualize();
+        } catch (error) {
+            console.error('Visualization error:', error);
+        }
+    }
+    
+    stopVisualization() {
+        const canvas = document.getElementById('audio-visualizer');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+    
+    cleanup() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        this.isRecording = false;
+    }
+}
+
+// Avatar Video Player with Enhanced Features
+class AvatarPlayer {
+    constructor(videoElement) {
+        this.video = videoElement;
+        this.currentVideoUrl = null;
+        
+        if (this.video) {
+            this.setupEventListeners();
+        }
+        
+        console.log('AvatarPlayer initialized');
+    }
+    
+    setupEventListeners() {
+        this.video.addEventListener('loadstart', () => {
+            this.showVideoLoading(true);
+        });
+        
+        this.video.addEventListener('canplay', () => {
+            this.showVideoLoading(false);
+        });
+        
+        this.video.addEventListener('ended', () => {
+            this.onVideoEnded();
+        });
+        
+        this.video.addEventListener('error', (e) => {
+            console.error('Video error:', e);
+            this.showVideoLoading(false);
+        });
+    }
+    
+    async playAvatarVideo(videoUrl) {
+        if (!this.video) return;
+        
+        try {
+            // Clean up previous video URL
+            if (this.currentVideoUrl) {
+                URL.revokeObjectURL(this.currentVideoUrl);
+            }
+            
+            this.video.src = videoUrl;
+            this.currentVideoUrl = videoUrl;
+            
+            // Wait for video to be ready and play
+            await this.video.play();
+            
+            console.log('Avatar video playing:', videoUrl);
+        } catch (error) {
+            console.error('Failed to play avatar video:', error);
+            this.showVideoLoading(false);
+        }
+    }
+    
+    async playAvatarResponse(videoBlob) {
+        if (!this.video) return;
+        
+        try {
+            // Clean up previous video URL
+            if (this.currentVideoUrl) {
+                URL.revokeObjectURL(this.currentVideoUrl);
+            }
+            
+            this.currentVideoUrl = URL.createObjectURL(videoBlob);
+            this.video.src = this.currentVideoUrl;
+            
+            await this.video.play();
+            
+            return new Promise((resolve) => {
+                this.video.addEventListener('ended', resolve, { once: true });
+            });
+        } catch (error) {
+            console.error('Failed to play avatar response:', error);
+            this.showVideoLoading(false);
+        }
+    }
+    
+    showVideoLoading(isLoading) {
+        const loadingOverlay = document.getElementById('video-loading');
+        if (loadingOverlay) {
+            loadingOverlay.style.display = isLoading ? 'flex' : 'none';
+        }
+    }
+    
+    onVideoEnded() {
+        // Clean up and prepare for next video
+        if (this.currentVideoUrl) {
+            URL.revokeObjectURL(this.currentVideoUrl);
+            this.currentVideoUrl = null;
+        }
+        console.log('Avatar video ended');
+    }
+}
+
+// Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    new AvatarApp();
-});
-
-// Utility functions
-function formatDuration(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-function showToast(message, type = 'info') {
-    // Simple toast notification
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center text-white bg-${type} border-0`;
-    toast.setAttribute('role', 'alert');
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${message}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    `;
+    console.log('AI Avatar App initializing...');
     
-    document.body.appendChild(toast);
+    const chatInterface = new ChatInterface();
     
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
+    // Set up event listeners
+    const sendButton = document.getElementById('send-button');
+    if (sendButton) {
+        sendButton.addEventListener('click', () => {
+            chatInterface.sendMessage();
+        });
+    }
     
-    // Remove from DOM after hiding
-    toast.addEventListener('hidden.bs.toast', () => {
-        toast.remove();
+    const textInput = document.getElementById('text-input');
+    if (textInput) {
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatInterface.sendMessage();
+            }
+        });
+    }
+    
+    const inputModeRadios = document.querySelectorAll('input[name="input-mode"]');
+    inputModeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            chatInterface.inputManager.setInputMode(e.target.value);
+        });
     });
-}
+    
+    const modelSelector = document.getElementById('model-selector');
+    if (modelSelector) {
+        modelSelector.addEventListener('change', (e) => {
+            chatInterface.setModel(e.target.value);
+        });
+    }
+    
+    const recordButton = document.getElementById('record-button');
+    if (recordButton) {
+        recordButton.addEventListener('click', () => {
+            chatInterface.sendMessage();
+        });
+    }
+    
+    const clearButton = document.getElementById('clear-conversation');
+    if (clearButton) {
+        clearButton.addEventListener('click', () => {
+            chatInterface.clearConversation();
+        });
+    }
+    
+    const exportButton = document.getElementById('export-conversation');
+    if (exportButton) {
+        exportButton.addEventListener('click', () => {
+            chatInterface.exportConversation();
+        });
+    }
+    
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/logout', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    window.location.href = result.redirect || '/login';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+    }
+    
+    console.log('AI Avatar App initialized successfully');
+});

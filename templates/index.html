@@ -3,138 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Avatar - Text-to-Speech Avatar</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>AI Avatar Chat</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Header -->
-            <header class="col-12 bg-primary text-white py-3">
-                <h1 class="h3 mb-0">🤖 AI Avatar - Text-to-Speech Avatar</h1>
-                <p class="mb-0">Powered by Azure AI Services</p>
-            </header>
-        </div>
-        
-        <div class="row mt-4">
-            <!-- Controls Panel -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Avatar Configuration</h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="avatarForm">
-                            <!-- Character Selection -->
-                            <div class="mb-3">
-                                <label for="character" class="form-label">Character</label>
-                                <select class="form-select" id="character" name="character">
-                                    <option value="lisa">Lisa (Professional Female)</option>
-                                    <option value="anna">Anna (Friendly Female)</option>
-                                    <option value="mike">Mike (Professional Male)</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Style Selection -->
-                            <div class="mb-3">
-                                <label for="style" class="form-label">Style</label>
-                                <select class="form-select" id="style" name="style">
-                                    <option value="graceful-sitting">Graceful Sitting</option>
-                                    <option value="standing">Standing</option>
-                                    <option value="casual-sitting">Casual Sitting</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Voice Selection -->
-                            <div class="mb-3">
-                                <label for="voice" class="form-label">Voice</label>
-                                <select class="form-select" id="voice" name="voice">
-                                    <option value="en-US-JennyNeural">Jenny (US English Female)</option>
-                                    <option value="en-US-AriaNeural">Aria (US English Female)</option>
-                                    <option value="en-US-GuyNeural">Guy (US English Male)</option>
-                                    <option value="en-US-DavisNeural">Davis (US English Male)</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Text Input -->
-                            <div class="mb-3">
-                                <label for="text" class="form-label">Text to Speak</label>
-                                <textarea class="form-control" id="text" name="text" rows="4" 
-                                          placeholder="Enter the text you want the avatar to speak...">Hello! Welcome to our AI Avatar demonstration. I can speak any text you provide using natural voice synthesis and expressive avatar animations.</textarea>
-                            </div>
-                            
-                            <!-- Generate Button -->
-                            <button type="submit" class="btn btn-primary w-100" id="generateBtn">
-                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                                Generate Avatar Speech
-                            </button>
-                        </form>
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>AI Avatar Assistant</h1>
+            <div class="header-controls">
+                <select id="model-selector" class="model-selector">
+                    <option value="gpt4o">GPT-4o</option>
+                    <option value="o3-mini">O3-mini</option>
+                </select>
+                <span id="model-indicator" class="model-indicator">GPT-4o</span>
+                <button id="logout-button" class="logout-button">Logout</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Avatar Display Section -->
+            <section class="avatar-section">
+                <div class="avatar-container">
+                    <video id="avatar-video" class="avatar-video" controls>
+                        Your browser does not support video playback.
+                    </video>
+                    <div id="video-loading" class="video-loading">
+                        <div class="spinner"></div>
+                        <p>Generating avatar response...</p>
                     </div>
                 </div>
                 
-                <!-- Status Panel -->
-                <div class="card mt-3">
-                    <div class="card-header">
-                        <h5>Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="status" class="alert alert-info">
-                            Ready to generate avatar speech
+                <!-- Avatar Settings Panel -->
+                <div class="avatar-settings-panel">
+                    <h3>Avatar Settings</h3>
+                    <div class="settings-grid">
+                        <div class="setting-group">
+                            <label for="avatar-character">Character:</label>
+                            <select id="avatar-character" class="setting-select">
+                                <option value="lisa">Lisa</option>
+                            </select>
                         </div>
+                        
+                        <div class="setting-group">
+                            <label for="avatar-style">Style:</label>
+                            <select id="avatar-style" class="setting-select">
+                                <option value="graceful-sitting">Graceful Sitting</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="avatar-voice">Voice:</label>
+                            <select id="avatar-voice" class="setting-select">
+                                <option value="en-US-JennyNeural">Jenny (US)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="avatar-background">Background:</label>
+                            <select id="avatar-background" class="setting-select">
+                                <option value="solid-white">Solid White</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="avatar-gesture">Gesture:</label>
+                            <select id="avatar-gesture" class="setting-select">
+                                <option value="">No Gesture</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="video-quality">Quality:</label>
+                            <select id="video-quality" class="setting-select">
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Avatar Preview -->
+                    <div id="avatar-preview" class="avatar-preview">
+                        <!-- Preview content will be dynamically generated -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Chat Section -->
+            <section class="chat-section">
+                <div id="chat-container" class="chat-container">
+                    <!-- Messages will be dynamically added here -->
+                </div>
+                
+                <!-- Error Message Display -->
+                <div id="error-message" class="error-message"></div>
+                
+                <!-- Loading Indicator -->
+                <div id="loading-indicator" class="loading-indicator">
+                    <div class="spinner"></div>
+                    <span>Processing your request...</span>
+                </div>
+            </section>
+        </main>
+
+        <!-- Input Section -->
+        <footer class="input-section">
+            <!-- Input Mode Toggle -->
+            <div class="input-mode-controls">
+                <label class="toggle-switch">
+                    <input type="radio" name="input-mode" value="text" id="input-mode-text" checked>
+                    <span>💬 Text</span>
+                </label>
+                <label class="toggle-switch">
+                    <input type="radio" name="input-mode" value="voice" id="input-mode-voice">
+                    <span>🎤 Voice</span>
+                </label>
+            </div>
+
+            <!-- Text Input Controls -->
+            <div id="text-controls" class="input-controls">
+                <div class="text-input-container">
+                    <textarea 
+                        id="text-input" 
+                        class="text-input" 
+                        placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
+                        rows="3">
+                    </textarea>
+                    <button id="send-button" class="send-button">
+                        <span>Send</span>
+                        <svg class="send-icon" viewBox="0 0 24 24">
+                            <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Voice Input Controls -->
+            <div id="voice-controls" class="input-controls" style="display: none;">
+                <div class="voice-input-container">
+                    <canvas id="audio-visualizer" class="audio-visualizer"></canvas>
+                    <button id="record-button" class="record-button">
+                        <span class="record-icon">🎤</span>
+                        <span class="record-text">Start Recording</span>
+                    </button>
+                    <div class="recording-instructions">
+                        <p>Click to start recording, click again to stop and send</p>
                     </div>
                 </div>
             </div>
-            
-            <!-- Avatar Display -->
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Avatar Display</h5>
-                    </div>
-                    <div class="card-body text-center">
-                        <div id="avatarContainer" class="mb-3">
-                            <div class="avatar-placeholder">
-                                <i class="fas fa-robot fa-5x text-muted mb-3"></i>
-                                <p class="text-muted">Avatar will appear here after generation</p>
-                            </div>
-                        </div>
-                        
-                        <!-- Audio Player -->
-                        <div id="audioContainer" class="d-none">
-                            <audio controls class="w-100 mb-3" id="audioPlayer">
-                                Your browser does not support the audio element.
-                            </audio>
-                        </div>
-                        
-                        <!-- Video Player (if avatar video is supported) -->
-                        <div id="videoContainer" class="d-none">
-                            <video controls class="w-100" id="videoPlayer" style="max-height: 400px;">
-                                Your browser does not support the video element.
-                            </video>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Footer -->
-        <footer class="row mt-5">
-            <div class="col-12 text-center text-muted py-3">
-                <p>&copy; 2025 AI Avatar - Powered by Azure AI Services</p>
-                <p>
-                    <a href="https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/what-is-text-to-speech-avatar" 
-                       target="_blank" class="text-decoration-none">
-                        Learn more about Azure Text-to-Speech Avatar
-                    </a>
-                </p>
+
+            <!-- Conversation Controls -->
+            <div class="conversation-controls">
+                <button id="clear-conversation" class="control-button">Clear Chat</button>
+                <button id="export-conversation" class="control-button">Export</button>
+                <button id="fullscreen-toggle" class="control-button">⛶ Fullscreen</button>
             </div>
         </footer>
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
