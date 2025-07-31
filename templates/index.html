@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar - Text-to-Speech Avatar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Header -->
+            <header class="col-12 bg-primary text-white py-3">
+                <h1 class="h3 mb-0">🤖 AI Avatar - Text-to-Speech Avatar</h1>
+                <p class="mb-0">Powered by Azure AI Services</p>
+            </header>
+        </div>
+        
+        <div class="row mt-4">
+            <!-- Controls Panel -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Avatar Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="avatarForm">
+                            <!-- Character Selection -->
+                            <div class="mb-3">
+                                <label for="character" class="form-label">Character</label>
+                                <select class="form-select" id="character" name="character">
+                                    <option value="lisa">Lisa (Professional Female)</option>
+                                    <option value="anna">Anna (Friendly Female)</option>
+                                    <option value="mike">Mike (Professional Male)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Style Selection -->
+                            <div class="mb-3">
+                                <label for="style" class="form-label">Style</label>
+                                <select class="form-select" id="style" name="style">
+                                    <option value="graceful-sitting">Graceful Sitting</option>
+                                    <option value="standing">Standing</option>
+                                    <option value="casual-sitting">Casual Sitting</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Voice Selection -->
+                            <div class="mb-3">
+                                <label for="voice" class="form-label">Voice</label>
+                                <select class="form-select" id="voice" name="voice">
+                                    <option value="en-US-JennyNeural">Jenny (US English Female)</option>
+                                    <option value="en-US-AriaNeural">Aria (US English Female)</option>
+                                    <option value="en-US-GuyNeural">Guy (US English Male)</option>
+                                    <option value="en-US-DavisNeural">Davis (US English Male)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Text Input -->
+                            <div class="mb-3">
+                                <label for="text" class="form-label">Text to Speak</label>
+                                <textarea class="form-control" id="text" name="text" rows="4" 
+                                          placeholder="Enter the text you want the avatar to speak...">Hello! Welcome to our AI Avatar demonstration. I can speak any text you provide using natural voice synthesis and expressive avatar animations.</textarea>
+                            </div>
+                            
+                            <!-- Generate Button -->
+                            <button type="submit" class="btn btn-primary w-100" id="generateBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Generate Avatar Speech
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Status Panel -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5>Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="status" class="alert alert-info">
+                            Ready to generate avatar speech
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Avatar Display -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Avatar Display</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div id="avatarContainer" class="mb-3">
+                            <div class="avatar-placeholder">
+                                <i class="fas fa-robot fa-5x text-muted mb-3"></i>
+                                <p class="text-muted">Avatar will appear here after generation</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Audio Player -->
+                        <div id="audioContainer" class="d-none">
+                            <audio controls class="w-100 mb-3" id="audioPlayer">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                        
+                        <!-- Video Player (if avatar video is supported) -->
+                        <div id="videoContainer" class="d-none">
+                            <video controls class="w-100" id="videoPlayer" style="max-height: 400px;">
+                                Your browser does not support the video element.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="row mt-5">
+            <div class="col-12 text-center text-muted py-3">
+                <p>&copy; 2025 AI Avatar - Powered by Azure AI Services</p>
+                <p>
+                    <a href="https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/what-is-text-to-speech-avatar" 
+                       target="_blank" class="text-decoration-none">
+                        Learn more about Azure Text-to-Speech Avatar
+                    </a>
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

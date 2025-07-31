@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  aiavatar-devcontainer:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+
+    volumes:
+      # Forward Docker socket for containerized development
+      - /var/run/docker.sock:/var/run/docker-host.sock 
+      # Mount the workspace
+      - ../..:/workspaces:cached
+      # Cache directories for better performance
+      - pip-cache:/home/vscode/.cache/pip
+      - azure-cache:/home/vscode/.azure
+
+    # Environment variables for AI Avatar development
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker-host.sock
+      - PYTHONPATH=/workspaces/${localWorkspaceFolderBasename}
+      - AZURE_CONFIG_DIR=/home/vscode/.azure
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+
+    # Keep container running
+    entrypoint: /usr/local/share/docker-init.sh
+    command: sleep infinity 
+
+    # Enable debugging capabilities
+    cap_add:
+     - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+
+    # Use "forwardPorts" in devcontainer.json to forward ports locally
+
+volumes:
+  pip-cache:
+  azure-cache:

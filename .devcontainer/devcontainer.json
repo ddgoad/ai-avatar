@@ -1,0 +1,99 @@
+// AI Avatar Development Container Configuration
+// Optimized for Azure AI Services, Text-to-Speech Avatar, Flask, and Python
+{
+	"name": "AIAvatar",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "aiavatar-devcontainer",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+	// Environment variables for AI Avatar development
+	"remoteEnv": {
+		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
+		"PYTHONPATH": "/workspaces/${localWorkspaceFolderBasename}",
+		"FLASK_ENV": "development",
+		"FLASK_DEBUG": "1"
+	},
+
+	"features": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+			"moby": true,
+			"installDockerBuildx": true,
+			"version": "latest",
+			"dockerDashComposeVersion": "none"
+		},
+		"ghcr.io/devcontainers/features/azure-cli:1": {
+			"version": "latest",
+			"installBicep": true,
+			"extensions": "azure-devops,ai-examples"
+		},
+		"ghcr.io/azure/azure-dev/azd:0": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts"
+		},
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/powershell:1": {
+			"version": "latest"
+		}
+	},
+	
+	// Forward ports for common development servers
+	"forwardPorts": [8000, 8080, 5000, 3000, 8501, 7860],
+
+	// Run startup script after container creation
+	"postCreateCommand": "bash .devcontainer/startup.sh",
+
+	// Run as vscode user for security
+	"remoteUser": "vscode",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				// Python Development
+				"ms-python.python",
+				"ms-python.debugpy",
+				"ms-python.flake8",
+				"ms-python.black-formatter",
+				"ms-python.isort",
+				"ms-python.pylint",
+				"ms-python.vscode-pylance",
+				
+				// GitHub Integration
+				"GitHub.copilot",
+				"GitHub.copilot-chat",
+				"GitHub.vscode-pull-request-github",
+				
+				// Azure Tools
+				"ms-azuretools.vscode-azureresourcegroups",
+				"ms-azuretools.vscode-azurefunctions",
+				"ms-azuretools.vscode-azureappservice",
+				"ms-azuretools.vscode-docker",
+				"ms-azuretools.azure-dev",
+				
+				// Web Development (HTML, CSS, JavaScript)
+				"ms-vscode.vscode-html-languageservice",
+				"ms-vscode.vscode-css-languageservice",
+				"ms-vscode.vscode-javascript",
+				"ms-vscode.vscode-typescript",
+				
+				// Code Quality and Formatting
+				"ms-vscode.vscode-json",
+				"redhat.vscode-yaml",
+				
+				// Documentation
+				"njpwerner.autodocstring",
+				
+				// Environment and Config
+				"ms-vscode.vscode-dotenv",
+				
+				// REST API Testing
+				"humao.rest-client"
+			]
+		}
+	}
+}
