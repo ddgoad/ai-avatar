@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 def create_app():
     """Application factory pattern"""
-    app = Flask(__name__)
+    app = Flask(__name__, 
+                template_folder='../templates',
+                static_folder='../static')
     
     # Configure Flask
     app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
