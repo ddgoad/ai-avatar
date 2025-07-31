@@ -2,35 +2,44 @@ targetScope = 'subscription'
 
 @minLength(1)
 @maxLength(64)
-@description('Name of the the environment which is used to generate a short unique hash used in all resources.')
+@description('Name of the environment which is used to generate a short unique hash used in all resources.')
 param environmentName string
 
 @minLength(1)
 @description('Primary location for all resources')
 param location string
 
-@description('Location for OpenAI resource')
-@allowed(['canadaeast', 'eastus', 'eastus2', 'francecentral', 'japaneast', 'northcentralus', 'swedencentral', 'switzerlandnorth', 'uksouth', 'westeurope', 'westus'])
-@metadata({
-  azd: {
-    type: 'location'
-  }
-})
-param openAiLocation string = 'eastus'
+@description('Azure OpenAI endpoint URL')
+param azureOpenAIEndpoint string = ''
 
-// Optional parameters to override the default azd resource naming conventions. Update the main.parameters.json file to set the values.
+@description('Azure OpenAI API key')
+@secure()
+param azureOpenAIKey string = ''
+
+// Resource naming following TDD specifications
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
 
-// Organize resources in a resource group
+// Single resource group as specified in TDD
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: '${abbrs.resourcesResourceGroups}${environmentName}'
+  name: 'rg-aiavatar'
   location: location
   tags: tags
 }
 
-// Create Azure Speech Services
+// User Assigned Managed Identity
+module managedIdentity './core/security/managed-identity.bicep' = {
+  name: 'managed-identity'
+  scope: rg
+  params: {
+    name: '${abbrs.managedIdentityUserAssignedIdentities}${resourceToken}'
+    location: location
+    tags: tags
+  }
+}
+
+// Azure Speech Services (S0 tier as specified in TDD)
 module speechServices './core/ai/speech-services.bicep' = {
   name: 'speech-services'
   scope: rg
@@ -39,62 +48,47 @@ module speechServices './core/ai/speech-services.bicep' = {
     location: location
     tags: tags
     sku: 'S0'
-    customSubDomainName: '${abbrs.cognitiveServicesAccounts}speech-${resourceToken}'
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
   }
 }
 
-// Create Container Apps Environment
-module containerAppsEnvironment './core/host/container-apps-environment.bicep' = {
-  name: 'container-apps-environment'
+// Azure Storage Account for avatar videos and temp files
+module storageAccount './core/storage/storage-account.bicep' = {
+  name: 'storage-account'
   scope: rg
   params: {
-    name: '${abbrs.appManagedEnvironments}${resourceToken}'
+    name: '${abbrs.storageStorageAccounts}${resourceToken}'
     location: location
     tags: tags
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
   }
 }
 
-// Create the web frontend
-module web './core/host/container-app.bicep' = {
-  name: 'web'
+// Azure Key Vault for secure credential storage
+module keyVault './core/security/keyvault.bicep' = {
+  name: 'key-vault'
   scope: rg
   params: {
-    name: '${abbrs.appContainerApps}web-${resourceToken}'
+    name: '${abbrs.keyVaultVaults}${resourceToken}'
     location: location
     tags: tags
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    env: [
-      {
-        name: 'AZURE_SPEECH_KEY'
-        value: speechServices.outputs.key
-      }
-      {
-        name: 'AZURE_SPEECH_REGION'
-        value: location
-      }
-      {
-        name: 'FLASK_ENV'
-        value: 'production'
-      }
-    ]
-    external: true
-    targetPort: 5000
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
   }
 }
 
-// Create Azure Container Registry
-module containerRegistry './core/host/container-registry.bicep' = {
-  name: 'container-registry'
+// Application Insights for monitoring
+module applicationInsights './core/monitor/applicationinsights.bicep' = {
+  name: 'application-insights'
   scope: rg
   params: {
-    name: '${abbrs.containerRegistryRegistries}${resourceToken}'
+    name: '${abbrs.insightsComponents}${resourceToken}'
     location: location
     tags: tags
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.id
   }
 }
 
-// Create Log Analytics Workspace
+// Log Analytics Workspace
 module logAnalyticsWorkspace './core/monitor/loganalytics.bicep' = {
   name: 'log-analytics'
   scope: rg
@@ -105,7 +99,136 @@ module logAnalyticsWorkspace './core/monitor/loganalytics.bicep' = {
   }
 }
 
-// Output the service endpoints
+// Container Registry for Docker images
+module containerRegistry './core/host/container-registry.bicep' = {
+  name: 'container-registry'
+  scope: rg
+  params: {
+    name: '${abbrs.containerRegistryRegistries}${resourceToken}'
+    location: location
+    tags: tags
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
+  }
+}
+
+// Container Apps Environment with Log Analytics integration
+module containerAppsEnvironment './core/host/container-apps-environment.bicep' = {
+  name: 'container-apps-environment'
+  scope: rg
+  params: {
+    name: '${abbrs.appManagedEnvironments}${resourceToken}'
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.id
+    applicationInsightsConnectionString: applicationInsights.outputs.connectionString
+  }
+}
+
+// Container App for Flask application
+module webApp './core/host/container-app.bicep' = {
+  name: 'web-app'
+  scope: rg
+  params: {
+    name: '${abbrs.appContainerApps}web-${resourceToken}'
+    location: location
+    tags: tags
+    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
+    containerRegistryName: containerRegistry.outputs.name
+    managedIdentityId: managedIdentity.outputs.id
+    env: [
+      {
+        name: 'AZURE_SPEECH_KEY'
+        secretRef: 'azure-speech-key'
+      }
+      {
+        name: 'AZURE_SPEECH_REGION'
+        value: location
+      }
+      {
+        name: 'AZURE_OPENAI_ENDPOINT'
+        value: azureOpenAIEndpoint
+      }
+      {
+        name: 'AZURE_OPENAI_KEY'
+        secretRef: 'azure-openai-key'
+      }
+      {
+        name: 'AZURE_STORAGE_CONNECTION_STRING'
+        secretRef: 'azure-storage-connection-string'
+      }
+      {
+        name: 'FLASK_SECRET_KEY'
+        secretRef: 'flask-secret-key'
+      }
+      {
+        name: 'FLASK_ENV'
+        value: 'production'
+      }
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: applicationInsights.outputs.connectionString
+      }
+    ]
+    secrets: [
+      {
+        name: 'azure-speech-key'
+        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/azure-speech-key'
+        identity: managedIdentity.outputs.id
+      }
+      {
+        name: 'azure-openai-key'
+        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/azure-openai-key'
+        identity: managedIdentity.outputs.id
+      }
+      {
+        name: 'azure-storage-connection-string'
+        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/azure-storage-connection-string'
+        identity: managedIdentity.outputs.id
+      }
+      {
+        name: 'flask-secret-key'
+        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/flask-secret-key'
+        identity: managedIdentity.outputs.id
+      }
+    ]
+    external: true
+    targetPort: 80
+    corsAllowedOrigins: ['*']
+  }
+}
+
+// Store secrets in Key Vault
+module keyVaultSecrets './core/security/keyvault-secrets.bicep' = {
+  name: 'key-vault-secrets'
+  scope: rg
+  params: {
+    keyVaultName: keyVault.outputs.name
+    secrets: [
+      {
+        name: 'azure-speech-key'
+        value: speechServices.outputs.key
+      }
+      {
+        name: 'azure-openai-key'
+        value: azureOpenAIKey
+      }
+      {
+        name: 'azure-storage-connection-string'
+        value: storageAccount.outputs.connectionString
+      }
+      {
+        name: 'flask-secret-key'
+        value: base64(guid(resourceGroup().id))
+      }
+    ]
+  }
+  dependsOn: [
+    speechServices
+    storageAccount
+  ]
+}
+
+// Output values as specified in TDD
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 output AZURE_RESOURCE_GROUP string = rg.name
@@ -114,9 +237,18 @@ output AZURE_SPEECH_ENDPOINT string = speechServices.outputs.endpoint
 output AZURE_SPEECH_KEY string = speechServices.outputs.key
 output AZURE_SPEECH_REGION string = location
 
+output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.outputs.name
+output AZURE_STORAGE_CONNECTION_STRING string = storageAccount.outputs.connectionString
+
+output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
+output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.endpoint
+
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 
-output SERVICE_WEB_IDENTITY_PRINCIPAL_ID string = web.outputs.identityPrincipalId
-output SERVICE_WEB_NAME string = web.outputs.name
-output SERVICE_WEB_URI string = web.outputs.uri
+output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = containerAppsEnvironment.outputs.name
+
+output SERVICE_WEB_IDENTITY_PRINCIPAL_ID string = managedIdentity.outputs.principalId
+output SERVICE_WEB_NAME string = webApp.outputs.name
+output SERVICE_WEB_URI string = webApp.outputs.uri
+output SERVICE_WEB_HOSTNAME string = webApp.outputs.hostname

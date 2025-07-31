@@ -1,18 +1,69 @@
-# azure.yaml - Azure Developer CLI configuration for AI Avatar
 name: ai-avatar
 metadata:
-  template: ai-avatar@0.0.1-beta
+  template: ai-avatar-containerapp@0.1.0
+
 services:
   web:
-    project: ./src
+    project: .
     language: python
     host: containerapp
-    env:
-      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY}
-      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION}
-      FLASK_ENV: production
+    docker:
+      path: ./Dockerfile
+      context: .
+      target: runtime
+
+hooks:
+  predeploy:
+    windows:
+      shell: pwsh
+      run: |
+        Write-Host "Running pre-deployment tasks..."
+        if (Test-Path requirements.txt) {
+          pip install -r requirements.txt
+        }
+        # Run tests if they exist
+        if (Test-Path tests/) {
+          python -m pytest tests/ -v
+        }
+    posix:
+      shell: sh
+      run: |
+        echo "Running pre-deployment tasks..."
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+        # Run tests if they exist
+        if [ -d tests/ ]; then
+          python -m pytest tests/ -v
+        fi
+
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: |
+        Write-Host "Configuring Key Vault secrets..."
+        if ($env:AZURE_SPEECH_KEY) {
+          az keyvault secret set --vault-name $env:AZURE_KEY_VAULT_NAME --name "azure-speech-key" --value $env:AZURE_SPEECH_KEY
+        }
+        if ($env:AZURE_OPENAI_KEY) {
+          az keyvault secret set --vault-name $env:AZURE_KEY_VAULT_NAME --name "azure-openai-key" --value $env:AZURE_OPENAI_KEY
+        }
+        Write-Host "Deployment completed successfully!"
+    posix:
+      shell: sh
+      run: |
+        echo "Configuring Key Vault secrets..."
+        if [ ! -z "$AZURE_SPEECH_KEY" ]; then
+          az keyvault secret set --vault-name "$AZURE_KEY_VAULT_NAME" --name "azure-speech-key" --value "$AZURE_SPEECH_KEY"
+        fi
+        if [ ! -z "$AZURE_OPENAI_KEY" ]; then
+          az keyvault secret set --vault-name "$AZURE_KEY_VAULT_NAME" --name "azure-openai-key" --value "$AZURE_OPENAI_KEY"
+        fi
+        echo "Deployment completed successfully!"
+
 infra:
   provider: bicep
   path: ./infra
+
 pipeline:
   provider: github

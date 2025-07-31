@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-form-wrapper">
+            <div class="login-header">
+                <h1>AI Avatar Assistant</h1>
+                <p>Please log in to access the avatar chat interface</p>
+            </div>
+            
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        name="username" 
+                        required 
+                        placeholder="Enter your username"
+                        autocomplete="username"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        required 
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" id="login-button" class="login-button">
+                        <span id="login-text">Login</span>
+                        <span id="login-spinner" class="spinner" style="display: none;"></span>
+                    </button>
+                </div>
+                
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </form>
+            
+            <div class="login-info">
+                <h3>Demo Credentials</h3>
+                <p><strong>Username:</strong> UTASAvatar</p>
+                <p><strong>Password:</strong> UTASRocks!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('login-form');
+            const loginButton = document.getElementById('login-button');
+            const loginText = document.getElementById('login-text');
+            const loginSpinner = document.getElementById('login-spinner');
+            const errorMessage = document.getElementById('error-message');
+            
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                // Get form data
+                const formData = new FormData(loginForm);
+                
+                // Show loading state
+                loginButton.disabled = true;
+                loginText.style.display = 'none';
+                loginSpinner.style.display = 'inline-block';
+                errorMessage.style.display = 'none';
+                
+                try {
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Redirect to main application
+                        window.location.href = result.redirect || '/';
+                    } else {
+                        // Show error message
+                        errorMessage.textContent = result.error || 'Login failed';
+                        errorMessage.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    errorMessage.textContent = 'Network error. Please try again.';
+                    errorMessage.style.display = 'block';
+                } finally {
+                    // Reset loading state
+                    loginButton.disabled = false;
+                    loginText.style.display = 'inline';
+                    loginSpinner.style.display = 'none';
+                }
+            });
+            
+            // Auto-fill demo credentials on page load
+            document.getElementById('username').value = 'UTASAvatar';
+            document.getElementById('password').value = 'UTASRocks!';
+        });
+    </script>
+</body>
+</html>

@@ -8,8 +8,11 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
-    "openAiLocation": {
-      "value": "${AZURE_OPENAI_LOCATION=eastus}"
+    "azureOpenAIEndpoint": {
+      "value": "${AZURE_OPENAI_ENDPOINT}"
+    },
+    "azureOpenAIKey": {
+      "value": "${AZURE_OPENAI_KEY}"
     }
   }
 }
