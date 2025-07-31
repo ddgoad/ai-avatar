@@ -1,7 +1,10 @@
 # GitHub Issue: Complete AI Avatar Application Implementation
 
 ## 🎯 Objective
-Implement a complete AI Avatar application based on the technical design document (`docs/technical-design-document.md`) with dual input support (text/voice), Azure Container Apps deployment, comprehensive avatar customization, and full end-to-end testing.
+Implement a complete AI Avatar application **strictly following the technical design document** (`docs/technical-design-document.md`) with dual input support (text/voice), Azure Container Apps deployment, comprehensive avatar customization, and full end-to-end testing.
+
+## ⚠️ CRITICAL REQUIREMENT
+**MUST FOLLOW THE TECHNICAL DESIGN DOCUMENT**: All implementation must strictly adhere to the specifications, architecture, code examples, and patterns defined in `docs/technical-design-document.md`. This document contains the complete blueprint for the application including exact API signatures, class structures, UI components, and Azure service configurations. Do not deviate from the design without explicit approval.
 
 ## 📋 Requirements Overview
 Build a Flask-based AI Avatar application that integrates:
@@ -13,15 +16,22 @@ Build a Flask-based AI Avatar application that integrates:
 - Comprehensive web UI with avatar settings
 - Full test coverage using Playwright
 
+**Implementation must exactly match the technical design document specifications including:**
+- Class structures and method signatures as defined in the TDD
+- API endpoint specifications and request/response formats
+- UI component layouts and JavaScript class implementations
+- Azure service integration patterns and configurations
+- Infrastructure templates and resource naming conventions
+
 ## 🏗️ Implementation Tasks
 
 ### 1. Project Structure Setup
-- [ ] Create complete Flask application structure as per technical design
-- [ ] Set up Python virtual environment and dependencies
-- [ ] Configure project according to `pyproject.toml` and `requirements.txt`
-- [ ] Implement proper logging configuration
+- [ ] Create complete Flask application structure **exactly as specified in TDD Section "Application Components"**
+- [ ] Set up Python virtual environment and dependencies **per TDD requirements**
+- [ ] Configure project according to `pyproject.toml` and `requirements.txt` **as defined in TDD**
+- [ ] Implement proper logging configuration **following TDD patterns**
 
-**File Structure to Create:**
+**File Structure to Create (from TDD):**
 ```
 src/
 ├── __init__.py
@@ -52,43 +62,45 @@ src/
 ### 2. Backend Implementation
 
 #### 2.1 Authentication System
-- [ ] Implement simple form-based authentication
-- [ ] Credentials: Login = `UTASAvatar`, Password = `UTASRocks!`
-- [ ] Session management with Flask sessions
-- [ ] Login/logout endpoints
+- [ ] Implement simple form-based authentication **exactly as shown in TDD Section "Authentication Module"**
+- [ ] Credentials: Login = `UTASAvatar`, Password = `UTASRocks!` **per TDD specification**
+- [ ] Session management with Flask sessions **following TDD patterns**
+- [ ] Login/logout endpoints **using TDD API specifications**
 
 #### 2.2 Input Processing Module
-- [ ] **Text Input Processing**: Direct text processing with validation
-- [ ] **Voice Input Processing**: Azure Speech-to-Text integration
-- [ ] WebRTC audio file handling (WebM format)
-- [ ] Input confidence scoring
-- [ ] Error handling for audio processing
+- [ ] **Text Input Processing**: Implement `InputProcessor` class **exactly as defined in TDD**
+- [ ] **Voice Input Processing**: Azure Speech-to-Text integration **per TDD specifications**
+- [ ] WebRTC audio file handling (WebM format) **following TDD patterns**
+- [ ] Input confidence scoring **as specified in TDD**
+- [ ] Error handling for audio processing **per TDD error handling patterns**
 
 #### 2.3 Azure OpenAI Integration
-- [ ] Azure OpenAI client configuration
-- [ ] Support for both GPT-4o and O3-mini models
-- [ ] Conversation history management
-- [ ] Token usage tracking
-- [ ] Model selection API endpoint
+- [ ] Implement `OpenAIService` class **exactly as defined in TDD**
+- [ ] Support for both GPT-4o and O3-mini models **per TDD model specifications**
+- [ ] Conversation history management **following TDD conversation patterns**
+- [ ] Token usage tracking **as specified in TDD**
+- [ ] Model selection API endpoint **using TDD API design**
 
 #### 2.4 Azure Speech Services Integration
-- [ ] Speech-to-Text configuration for voice input
-- [ ] Audio format conversion (WebM to WAV)
-- [ ] Real-time transcription support
-- [ ] Error handling for speech recognition
+- [ ] Implement Speech-to-Text **exactly as shown in TDD Speech Processing Module**
+- [ ] Audio format conversion (WebM to WAV) **per TDD specifications**
+- [ ] Real-time transcription support **following TDD patterns**
+- [ ] Error handling for speech recognition **per TDD error handling**
 
 #### 2.5 Avatar Management System
-- [ ] **Character Options**: Lisa, Mark, Anna, Jenny, Ryan
-- [ ] **Style Options**: graceful-sitting, standing, casual, professional
-- [ ] **Voice Selection**: 400+ Azure Neural Voices with filtering
-- [ ] **Background Options**: solid colors, custom images, transparent
-- [ ] **Gesture Integration**: wave, nod, thumbs-up, point via SSML
-- [ ] **Quality Settings**: 720p/1080p video output
-- [ ] Avatar video generation with Azure Text-to-Speech Avatar API
-- [ ] Video storage in Azure Blob Storage
-- [ ] Configuration validation
+- [ ] Implement `AvatarManager` class **exactly as defined in TDD with all methods and properties**
+- [ ] **Character Options**: Lisa, Mark, Anna, Jenny, Ryan **per TDD specifications**
+- [ ] **Style Options**: graceful-sitting, standing, casual, professional **as defined in TDD**
+- [ ] **Voice Selection**: 400+ Azure Neural Voices with filtering **following TDD implementation**
+- [ ] **Background Options**: solid colors, custom images, transparent **per TDD background_options**
+- [ ] **Gesture Integration**: wave, nod, thumbs-up, point via SSML **using TDD gesture patterns**
+- [ ] **Quality Settings**: 720p/1080p video output **as specified in TDD**
+- [ ] Avatar video generation with Azure Text-to-Speech Avatar API **exactly per TDD**
+- [ ] Video storage in Azure Blob Storage **following TDD storage patterns**
+- [ ] Configuration validation **using TDD validation methods**
 
 #### 2.6 API Endpoints Implementation
+**Implement ALL endpoints exactly as specified in TDD "Flask Routes" section:**
 ```python
 # Required API endpoints:
 POST /login                    # User authentication
@@ -106,24 +118,25 @@ GET  /api/export-conversation # Export conversation as JSON
 ### 3. Frontend Implementation
 
 #### 3.1 HTML Templates
-- [ ] **Login page** (`templates/login.html`)
-- [ ] **Main application** (`templates/index.html`) with:
-  - Avatar video player section
-  - Avatar settings panel with all customization options
-  - Chat interface with message history
-  - Dual input controls (text/voice toggle)
-  - Model selection dropdown
-  - Conversation management controls
+- [ ] **Login page** (`templates/login.html`) **per TDD template specifications**
+- [ ] **Main application** (`templates/index.html`) **exactly as defined in TDD "HTML Template Structure"** with:
+  - Avatar video player section **per TDD specifications**
+  - Avatar settings panel with all customization options **exactly as shown in TDD**
+  - Chat interface with message history **following TDD design**
+  - Dual input controls (text/voice toggle) **per TDD input specifications**
+  - Model selection dropdown **as defined in TDD**
+  - Conversation management controls **following TDD patterns**
 
 #### 3.2 JavaScript Implementation
-- [ ] **InputManager class**: Handle text/voice input modes
-- [ ] **ChatInterface class**: Manage conversations and UI updates
-- [ ] **AudioRecorder class**: WebRTC audio capture with visualization
-- [ ] **AvatarPlayer class**: Video playback and management
-- [ ] **Avatar Settings**: Real-time configuration updates
-- [ ] **WebRTC Integration**: Audio recording with proper codec support
-- [ ] **Real-time Audio Visualization**: Canvas-based waveform display
-- [ ] **Responsive Design**: Mobile and desktop compatibility
+**Implement ALL JavaScript classes exactly as defined in TDD "JavaScript Implementation" section:**
+- [ ] **InputManager class**: Handle text/voice input modes **per TDD specifications with all methods**
+- [ ] **ChatInterface class**: Manage conversations and UI updates **exactly as defined in TDD**
+- [ ] **AudioRecorder class**: WebRTC audio capture with visualization **following TDD implementation**
+- [ ] **AvatarPlayer class**: Video playback and management **per TDD specifications**
+- [ ] **Avatar Settings**: Real-time configuration updates **using TDD patterns**
+- [ ] **WebRTC Integration**: Audio recording with proper codec support **as specified in TDD**
+- [ ] **Real-time Audio Visualization**: Canvas-based waveform display **exactly per TDD**
+- [ ] **Responsive Design**: Mobile and desktop compatibility **following TDD design patterns**
 
 #### 3.3 CSS Styling
 - [ ] Modern, responsive design (`static/css/style.css`)
@@ -151,12 +164,12 @@ GET  /api/export-conversation # Export conversation as JSON
 - [ ] **User Assigned Managed Identity** with proper RBAC assignments
 
 #### 4.3 Bicep Templates
-- [ ] `infra/main.bicep` - Main infrastructure template
-- [ ] `infra/main.parameters.json` - Parameter configuration
-- [ ] Resource naming with proper tokenization
-- [ ] Environment tagging (`azd-env-name`)
-- [ ] Proper CORS configuration
-- [ ] Secret management integration
+- [ ] `infra/main.bicep` - Main infrastructure template **exactly as specified in TDD "Infrastructure Components"**
+- [ ] `infra/main.parameters.json` - Parameter configuration **per TDD parameter specifications**
+- [ ] Resource naming with proper tokenization **following TDD naming conventions**
+- [ ] Environment tagging (`azd-env-name`) **as required by TDD**
+- [ ] Proper CORS configuration **per TDD CORS specifications**
+- [ ] Secret management integration **following TDD Key Vault patterns**
 
 ### 5. Docker Configuration
 - [ ] **Dockerfile** for Container Apps deployment
@@ -168,11 +181,11 @@ GET  /api/export-conversation # Export conversation as JSON
 - [ ] Health check endpoints
 
 ### 6. Azure Developer CLI (AZD) Configuration
-- [ ] **azure.yaml** configuration for Container Apps
-- [ ] Service definition for web application
-- [ ] Pre-deploy and post-deploy hooks
-- [ ] Environment variable configuration
-- [ ] Secret management setup
+- [ ] **azure.yaml** configuration for Container Apps **exactly as specified in TDD "Azure Configuration"**
+- [ ] Service definition for web application **per TDD service specifications**
+- [ ] Pre-deploy and post-deploy hooks **following TDD hook patterns**
+- [ ] Environment variable configuration **as defined in TDD**
+- [ ] Secret management setup **per TDD Key Vault integration**
 
 ### 7. Environment Configuration
 - [ ] `.env.example` template file
@@ -386,18 +399,20 @@ Upon completion, the application should:
 5. **Work seamlessly** across desktop and mobile browsers
 6. **Meet performance targets** for response times and user experience
 7. **Include comprehensive documentation** for setup and usage
+8. **EXACTLY MATCH THE TECHNICAL DESIGN DOCUMENT** in all implementation details
 
 ## 📋 Final Checklist
-- [ ] All code implemented and tested
+- [ ] All code implemented and tested **following TDD specifications**
 - [ ] Playwright test suite complete and passing
-- [ ] Bicep templates for Container Apps ready
-- [ ] Docker configuration working
-- [ ] AZD deployment configured
+- [ ] Bicep templates for Container Apps ready **per TDD infrastructure design**
+- [ ] Docker configuration working **following TDD containerization specs**
+- [ ] AZD deployment configured **exactly as specified in TDD**
 - [ ] Documentation complete
 - [ ] Security review completed
 - [ ] Performance testing completed
+- [ ] **TDD compliance verified** - All implementations match technical design document
 - [ ] Ready for production deployment
 
 ---
 
-**Note**: The coder agent should reference the technical design document (`docs/technical-design-document.md`) for detailed implementation specifications, API designs, and architectural guidance. All Azure service integrations should follow the patterns and configurations specified in the technical design.
+**FINAL NOTE**: The coder agent MUST reference and strictly follow the technical design document (`docs/technical-design-document.md`) for ALL implementation details. This includes exact class structures, method signatures, API designs, UI components, infrastructure patterns, and architectural guidance. Any deviation from the TDD specifications requires explicit approval. The TDD is the authoritative source for all implementation decisions.
