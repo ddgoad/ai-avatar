@@ -37,10 +37,10 @@ USER appuser
 
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:80/health || exit 1
+    CMD curl -f http://localhost:5000/health || exit 1
 
-# Expose port 80 (Container Apps requirement)
-EXPOSE 80
+# Expose port 5000 (Flask default)
+EXPOSE 5000
 
 # Production stage
 FROM base as runtime
@@ -48,7 +48,7 @@ FROM base as runtime
 # Set Flask environment
 ENV FLASK_ENV=production \
     FLASK_HOST=0.0.0.0 \
-    FLASK_PORT=80
+    FLASK_PORT=5000
 
 # Use Gunicorn WSGI server for production
-CMD ["gunicorn", "--bind", "0.0.0.0:80", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "src.app:create_app()"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "src.app:create_app()"]

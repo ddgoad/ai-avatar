@@ -16,6 +16,9 @@ param azureOpenAIEndpoint string = ''
 @secure()
 param azureOpenAIKey string = ''
 
+@description('Container image for the web service')
+param containerImage string = ''
+
 // Resource naming following TDD specifications
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
@@ -60,7 +63,7 @@ module storageAccount './core/storage/storage-account.bicep' = {
     name: '${abbrs.storageStorageAccounts}${resourceToken}'
     location: location
     tags: tags
-    managedIdentityPrincipalId: managedIdentity.outputs.principalId
+    containers: ['avatars', 'audio']
   }
 }
 
@@ -72,19 +75,7 @@ module keyVault './core/security/keyvault.bicep' = {
     name: '${abbrs.keyVaultVaults}${resourceToken}'
     location: location
     tags: tags
-    managedIdentityPrincipalId: managedIdentity.outputs.principalId
-  }
-}
-
-// Application Insights for monitoring
-module applicationInsights './core/monitor/applicationinsights.bicep' = {
-  name: 'application-insights'
-  scope: rg
-  params: {
-    name: '${abbrs.insightsComponents}${resourceToken}'
-    location: location
-    tags: tags
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspace.outputs.id
+    principalId: managedIdentity.outputs.principalId
   }
 }
 
@@ -99,6 +90,18 @@ module logAnalyticsWorkspace './core/monitor/loganalytics.bicep' = {
   }
 }
 
+// Application Insights for monitoring
+module applicationInsights './core/monitor/applicationinsights.bicep' = {
+  name: 'application-insights'
+  scope: rg
+  params: {
+    name: '${abbrs.insightsComponents}${resourceToken}'
+    location: location
+    tags: tags
+    workspaceResourceId: logAnalyticsWorkspace.outputs.id
+  }
+}
+
 // Container Registry for Docker images
 module containerRegistry './core/host/container-registry.bicep' = {
   name: 'container-registry'
@@ -107,7 +110,7 @@ module containerRegistry './core/host/container-registry.bicep' = {
     name: '${abbrs.containerRegistryRegistries}${resourceToken}'
     location: location
     tags: tags
-    managedIdentityPrincipalId: managedIdentity.outputs.principalId
+    principalId: managedIdentity.outputs.principalId
   }
 }
 
@@ -131,11 +134,14 @@ module webApp './core/host/container-app.bicep' = {
   params: {
     name: '${abbrs.appContainerApps}web-${resourceToken}'
     location: location
-    tags: tags
-    containerAppsEnvironmentName: containerAppsEnvironment.outputs.name
-    containerRegistryName: containerRegistry.outputs.name
-    managedIdentityId: managedIdentity.outputs.id
-    env: [
+    tags: union(tags, { 'azd-service-name': 'web' })
+    containerAppsEnvironmentId: containerAppsEnvironment.outputs.id
+    containerRegistryLoginServer: containerRegistry.outputs.loginServer
+    userAssignedIdentityId: managedIdentity.outputs.id
+    containerImage: !empty(containerImage) ? containerImage : 'nginx:alpine'
+    minReplicas: 1
+    maxReplicas: 3
+    environmentVariables: [
       {
         name: 'AZURE_SPEECH_KEY'
         secretRef: 'azure-speech-key'
@@ -172,29 +178,29 @@ module webApp './core/host/container-app.bicep' = {
     secrets: [
       {
         name: 'azure-speech-key'
-        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/azure-speech-key'
+        keyVaultUrl: '${keyVault.outputs.vaultUri}secrets/azure-speech-key'
         identity: managedIdentity.outputs.id
       }
       {
         name: 'azure-openai-key'
-        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/azure-openai-key'
+        keyVaultUrl: '${keyVault.outputs.vaultUri}secrets/azure-openai-key'
         identity: managedIdentity.outputs.id
       }
       {
         name: 'azure-storage-connection-string'
-        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/azure-storage-connection-string'
+        keyVaultUrl: '${keyVault.outputs.vaultUri}secrets/azure-storage-connection-string'
         identity: managedIdentity.outputs.id
       }
       {
         name: 'flask-secret-key'
-        keyVaultUrl: '${keyVault.outputs.endpoint}secrets/flask-secret-key'
+        keyVaultUrl: '${keyVault.outputs.vaultUri}secrets/flask-secret-key'
         identity: managedIdentity.outputs.id
       }
     ]
-    external: true
-    targetPort: 80
-    corsAllowedOrigins: ['*']
   }
+  dependsOn: [
+    keyVaultSecrets
+  ]
 }
 
 // Store secrets in Key Vault
@@ -218,14 +224,10 @@ module keyVaultSecrets './core/security/keyvault-secrets.bicep' = {
       }
       {
         name: 'flask-secret-key'
-        value: base64(guid(resourceGroup().id))
+        value: base64(uniqueString(subscription().subscriptionId, environmentName))
       }
     ]
   }
-  dependsOn: [
-    speechServices
-    storageAccount
-  ]
 }
 
 // Output values as specified in TDD
@@ -241,14 +243,18 @@ output AZURE_STORAGE_ACCOUNT_NAME string = storageAccount.outputs.name
 output AZURE_STORAGE_CONNECTION_STRING string = storageAccount.outputs.connectionString
 
 output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
-output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.endpoint
+output AZURE_KEY_VAULT_ENDPOINT string = keyVault.outputs.vaultUri
 
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
+
+output WEB_APP_NAME string = webApp.outputs.name
+output WEB_APP_URI string = webApp.outputs.uri
+output WEB_APP_FQDN string = webApp.outputs.fqdn
 
 output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = containerAppsEnvironment.outputs.name
 
 output SERVICE_WEB_IDENTITY_PRINCIPAL_ID string = managedIdentity.outputs.principalId
 output SERVICE_WEB_NAME string = webApp.outputs.name
 output SERVICE_WEB_URI string = webApp.outputs.uri
-output SERVICE_WEB_HOSTNAME string = webApp.outputs.hostname
+output SERVICE_WEB_FQDN string = webApp.outputs.fqdn
