@@ -58,7 +58,7 @@ def login():
             session['login_time'] = datetime.utcnow().isoformat()
             
             logger.info(f"User '{username}' logged in successfully")
-            return jsonify({'success': True, 'redirect': '/'})
+            return jsonify({'success': True, 'redirect': '/chat'})
         else:
             logger.warning(f"Failed login attempt for user '{username}'")
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
@@ -502,4 +502,39 @@ def get_config():
         })
     except Exception as e:
         logger.error(f"Error getting config: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@api_bp.route('/azure-config', methods=['GET'])
+def azure_config():
+    """
+    Azure configuration endpoint for the Azure sample implementation.
+    Returns necessary Azure service configuration for the frontend.
+    """
+    if not is_authenticated(session):
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    try:
+        # Get Azure service configuration from environment
+        config = {
+            'speech_key': os.getenv('AZURE_SPEECH_KEY'),
+            'speech_region': os.getenv('AZURE_SPEECH_REGION'),
+            'openai_endpoint': os.getenv('AZURE_OPENAI_ENDPOINT'),
+            'openai_key': os.getenv('AZURE_OPENAI_KEY'),
+            'search_endpoint': os.getenv('AZURE_SEARCH_ENDPOINT'),
+            'search_key': os.getenv('AZURE_SEARCH_KEY'),
+            'search_index': os.getenv('AZURE_SEARCH_INDEX'),
+            'avatar_character': os.getenv('AVATAR_CHARACTER', 'lisa'),
+            'avatar_style': os.getenv('AVATAR_STYLE', 'casual-sitting')
+        }
+        
+        # Filter out None values and only return configured services
+        filtered_config = {k: v for k, v in config.items() if v is not None}
+        
+        return jsonify({
+            'success': True,
+            'config': filtered_config
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting azure config: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500

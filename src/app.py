@@ -47,7 +47,21 @@ def create_app():
     
     @app.route('/')
     def index():
-        """Main application page - requires authentication"""
+        """Main application page - redirect to chat for Azure sample implementation"""
+        if not is_authenticated(session):
+            return redirect(url_for('login'))
+        return redirect(url_for('chat'))
+    
+    @app.route('/chat')
+    def chat():
+        """Azure sample implementation chat page - requires authentication"""
+        if not is_authenticated(session):
+            return redirect(url_for('login'))
+        return render_template('chat.html')
+    
+    @app.route('/original')
+    def original():
+        """Original implementation page - requires authentication"""
         if not is_authenticated(session):
             return redirect(url_for('login'))
         return render_template('index.html')
@@ -56,7 +70,7 @@ def create_app():
     def login():
         """Login page"""
         if is_authenticated(session):
-            return redirect(url_for('index'))
+            return redirect(url_for('chat'))
         return render_template('login.html')
     
     @app.route('/health')

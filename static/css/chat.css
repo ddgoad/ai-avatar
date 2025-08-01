@@ -1,0 +1,351 @@
+/* AI Avatar Chat - Azure Sample Implementation Styles */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.logout-button {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.logout-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+#configuration {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#configuration h2 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin: -20px -20px 20px -20px;
+    padding: 15px 20px;
+    border-radius: 10px 10px 0 0;
+    font-size: 18px;
+}
+
+#configuration h2:not(:first-child) {
+    margin-top: 30px;
+    border-radius: 5px;
+}
+
+.config-section {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.config-section label {
+    font-weight: 500;
+    color: #555;
+}
+
+.config-section input,
+.config-section select,
+.config-section textarea {
+    padding: 8px 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.config-section input:focus,
+.config-section select:focus,
+.config-section textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.config-section textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.config-section div {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.config-section input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.controls {
+    display: flex;
+    gap: 15px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.controls button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.controls button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.controls button:disabled {
+    background: linear-gradient(135deg, #ccc 0%, #999 100%);
+    cursor: not-allowed;
+    transform: none;
+}
+
+#videoContainer {
+    position: relative;
+    width: 960px;
+    max-width: 100%;
+    margin: 20px auto;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+#overlayArea {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+#chatHistory {
+    width: 360px;
+    height: 480px;
+    font-size: 14px;
+    border: none;
+    resize: none;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px;
+    overflow-y: auto;
+    border-radius: 0 0 0 10px;
+    pointer-events: auto;
+}
+
+#chatHistory::-webkit-scrollbar {
+    width: 8px;
+}
+
+#chatHistory::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#chatHistory::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+#localVideo video,
+#remoteVideo video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+#remoteVideo {
+    min-height: 540px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+#subtitles {
+    width: 100%;
+    text-align: center;
+    color: white;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    font-size: 22px;
+    font-weight: 500;
+    position: absolute;
+    bottom: 5%;
+    z-index: 999;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+    margin: 0 20px;
+}
+
+.message-input {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#showTypeMessageCheckbox {
+    margin-bottom: 15px;
+}
+
+#showTypeMessageCheckbox input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+#userMessageBox {
+    width: 100%;
+    min-height: 150px;
+    max-height: 200px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    padding: 15px;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-y: auto;
+    background: #fafafa;
+    transition: border-color 0.3s;
+}
+
+#userMessageBox:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+}
+
+#userMessageBox[contenteditable]:empty::before {
+    content: attr(placeholder);
+    color: #aaa;
+    font-style: italic;
+}
+
+#uploadImgIcon {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: transform 0.2s;
+    margin-top: 10px;
+}
+
+#uploadImgIcon:hover {
+    transform: scale(1.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .config-section {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+    
+    .config-section label {
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .controls {
+        justify-content: center;
+    }
+    
+    .controls button {
+        flex: 1;
+        min-width: 120px;
+    }
+    
+    #videoContainer {
+        width: 100%;
+    }
+    
+    #chatHistory {
+        width: 100%;
+        height: 200px;
+        position: relative;
+        margin-bottom: 10px;
+        border-radius: 10px;
+    }
+}
+
+/* Animation for loading states */
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Status indicators */
+.status-connected {
+    color: #4CAF50;
+    font-weight: 500;
+}
+
+.status-disconnected {
+    color: #f44336;
+    font-weight: 500;
+}
+
+.status-connecting {
+    color: #ff9800;
+    font-weight: 500;
+}

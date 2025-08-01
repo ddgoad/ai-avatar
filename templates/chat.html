@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar Chat - Azure Sample Implementation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>AI Avatar Chat - Azure Sample Implementation</h1>
+        <div class="header-controls">
+            <button id="logout-button" class="logout-button">Logout</button>
+        </div>
+    </div>
+
+    <div id="configuration">
+        <h2>Azure Speech Resource</h2>
+        <div class="config-section">
+            <label for="region">Region:</label>
+            <select id="region">
+                <option value="westus2">West US 2</option>
+                <option value="westeurope">West Europe</option>
+                <option value="southeastasia">Southeast Asia</option>
+                <option value="southcentralus">South Central US</option>
+                <option value="northeurope">North Europe</option>
+                <option value="eastus">East US</option>
+                <option value="eastus2">East US 2</option>
+                <option value="centralus">Central US</option>
+                <option value="northcentralus">North Central US</option>
+                <option value="westcentralus">West Central US</option>
+                <option value="westus">West US</option>
+                <option value="australiaeast">Australia East</option>
+                <option value="brazilsouth">Brazil South</option>
+                <option value="canadacentral">Canada Central</option>
+                <option value="centralindia">Central India</option>
+                <option value="eastasia">East Asia</option>
+                <option value="francecentral">France Central</option>
+                <option value="japaneast">Japan East</option>
+                <option value="japanwest">Japan West</option>
+                <option value="koreacentral">Korea Central</option>
+                <option value="uksouth">UK South</option>
+                <option value="swedencentral">Sweden Central</option>
+            </select>
+            
+            <label for="APIKey">API Key:</label>
+            <input id="APIKey" type="password" size="32" placeholder="Enter your Azure Speech API Key" />
+            
+            <div>
+                <input type="checkbox" id="enablePrivateEndpoint" onchange="window.updatePrivateEndpoint()">
+                <label for="enablePrivateEndpoint">Enable Private Endpoint</label>
+            </div>
+            
+            <div id="showPrivateEndpointCheckBox" hidden>
+                <label for="privateEndpoint">Private Endpoint:</label>
+                <input id="privateEndpoint" type="text" size="64" placeholder="https://{your custom name}.cognitiveservices.azure.com/" />
+            </div>
+        </div>
+
+        <h2>Azure OpenAI Resource</h2>
+        <div class="config-section">
+            <label for="azureOpenAIEndpoint">Endpoint:</label>
+            <input id="azureOpenAIEndpoint" type="text" size="64" placeholder="https://your-resource.openai.azure.com/" />
+            
+            <label for="azureOpenAIApiKey">API Key:</label>
+            <input id="azureOpenAIApiKey" type="password" size="32" placeholder="Enter your Azure OpenAI API Key" />
+            
+            <label for="azureOpenAIDeploymentName">Deployment Name:</label>
+            <input id="azureOpenAIDeploymentName" type="text" size="32" placeholder="gpt-4o" />
+            
+            <label for="prompt">System Prompt:</label>
+            <textarea id="prompt" rows="3">You are an AI assistant that helps people find information.</textarea>
+            
+            <div>
+                <input type="checkbox" id="enableOyd" onchange="window.updataEnableOyd()">
+                <label for="enableOyd">Enable On Your Data</label>
+            </div>
+        </div>
+
+        <div id="cogSearchConfig" hidden>
+            <h2>Azure Cognitive Search Resource</h2>
+            <div class="config-section">
+                <label for="azureCogSearchEndpoint">Endpoint:</label>
+                <input id="azureCogSearchEndpoint" type="text" size="64" placeholder="https://your-search.search.windows.net" />
+                
+                <label for="azureCogSearchApiKey">API Key:</label>
+                <input id="azureCogSearchApiKey" type="password" size="32" placeholder="Enter your Search API Key" />
+                
+                <label for="azureCogSearchIndexName">Index Name:</label>
+                <input id="azureCogSearchIndexName" type="text" size="32" placeholder="your-index-name" />
+            </div>
+        </div>
+
+        <h2>STT / TTS Configuration</h2>
+        <div class="config-section">
+            <label for="sttLocales">STT Locale(s):</label>
+            <input id="sttLocales" type="text" size="64" value="en-US,de-DE,es-ES,fr-FR,it-IT,ja-JP,ko-KR,zh-CN" />
+            
+            <label for="ttsVoice">TTS Voice:</label>
+            <input id="ttsVoice" type="text" size="32" value="en-US-AvaMultilingualNeural" />
+            
+            <label for="customVoiceEndpointId">Custom Voice Deployment ID:</label>
+            <input id="customVoiceEndpointId" type="text" size="32" placeholder="Optional" />
+            
+            <div>
+                <input type="checkbox" id="continuousConversation">
+                <label for="continuousConversation">Continuous Conversation</label>
+            </div>
+        </div>
+
+        <h2>Avatar Configuration</h2>
+        <div class="config-section">
+            <label for="talkingAvatarCharacter">Avatar Character:</label>
+            <input id="talkingAvatarCharacter" type="text" size="16" value="lisa" />
+            
+            <label for="talkingAvatarStyle">Avatar Style:</label>
+            <input id="talkingAvatarStyle" type="text" size="16" value="casual-sitting" />
+            
+            <div>
+                <input type="checkbox" id="customizedAvatar" onchange="window.updateCustomAvatarBox()">
+                <label for="customizedAvatar">Custom Avatar</label>
+                
+                <input type="checkbox" id="useBuiltInVoice" disabled>
+                <label for="useBuiltInVoice">Use Built-In Voice</label>
+            </div>
+            
+            <div>
+                <input type="checkbox" id="autoReconnectAvatar">
+                <label for="autoReconnectAvatar">Auto Reconnect</label>
+            </div>
+            
+            <div>
+                <input type="checkbox" id="useLocalVideoForIdle" onchange="window.updateLocalVideoForIdle()">
+                <label for="useLocalVideoForIdle">Use Local Video for Idle</label>
+            </div>
+            
+            <div>
+                <input type="checkbox" id="showSubtitles">
+                <label for="showSubtitles">Show Subtitles</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="startSession" onclick="window.startSession()">Open Avatar Session</button>
+        <button id="microphone" onclick="window.microphone()" disabled>Start Microphone</button>
+        <button id="stopSpeaking" onclick="stopSpeaking()" disabled>Stop Speaking</button>
+        <button id="clearChatHistory" onclick="window.clearChatHistory()">Clear Chat History</button>
+        <button id="stopSession" onclick="window.stopSession()" disabled>Close Avatar Session</button>
+    </div>
+
+    <div id="videoContainer">
+        <div id="overlayArea">
+            <div id="chatHistory" hidden></div>
+        </div>
+        
+        <div id="localVideo" hidden>
+            <video src="{{ url_for('static', filename='video/lisa-casual-sitting-idle.mp4') }}" autoplay loop muted></video>
+        </div>
+        
+        <div id="remoteVideo"></div>
+        
+        <div id="subtitles" hidden></div>
+    </div>
+
+    <div class="message-input">
+        <div id="showTypeMessageCheckbox">
+            <input type="checkbox" id="showTypeMessage" onchange="window.updateTypeMessageBox()" disabled>
+            <label for="showTypeMessage">Type Message</label>
+        </div>
+        
+        <div id="userMessageBox" hidden contentEditable="true" placeholder="Type your message and press Enter..."></div>
+        
+        <div>
+            <img id="uploadImgIcon" src="{{ url_for('static', filename='image/attachment.jpg') }}" alt="Upload" hidden />
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/chat-azure.js') }}"></script>
+    <script>
+        // Initialize with server-provided configuration
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Get configuration from server
+                const response = await fetch('/api/azure-config');
+                if (response.ok) {
+                    const config = await response.json();
+                    
+                    // Pre-populate fields with server configuration
+                    if (config.speech_key) {
+                        document.getElementById('APIKey').value = config.speech_key;
+                    }
+                    if (config.speech_region) {
+                        document.getElementById('region').value = config.speech_region;
+                    }
+                    if (config.openai_endpoint) {
+                        document.getElementById('azureOpenAIEndpoint').value = config.openai_endpoint;
+                    }
+                    if (config.openai_key) {
+                        document.getElementById('azureOpenAIApiKey').value = config.openai_key;
+                    }
+                    if (config.openai_deployment) {
+                        document.getElementById('azureOpenAIDeploymentName').value = config.openai_deployment;
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not load server configuration:', error);
+            }
+            
+            // Set up logout functionality
+            document.getElementById('logout-button').addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/logout', { method: 'POST' });
+                    const result = await response.json();
+                    if (result.success) {
+                        window.location.href = result.redirect || '/login';
+                    }
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    window.location.href = '/login';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
