@@ -1,34 +1,124 @@
 # AI Avatar Application
 
-A comprehensive Flask-based AI Avatar application that integrates Azure Text-to-Speech Avatar service with Azure OpenAI for intelligent conversational experiences. Built following the Technical Design Document specifications with dual input support (text/voice), Azure Container Apps deployment, and comprehensive avatar customization.
+A comprehensive Flask-based AI Avatar application that integrates Azure Text-to-Speech Avatar service with Azure OpenAI for intelligent conversational experiences. Built with real-time WebRTC avatar streaming, Azure Container Apps deployment, and comprehensive avatar customization using Azure-validated character and style combinations.
 
 ## 🎯 Features
 
 - **Dual Input Modes**: Text and voice input with real-time processing
-- **AI Conversation**: GPT-4o and O3-mini model selection for intelligent responses
-- **Avatar Customization**: Complete avatar personalization with:
-  - Characters: Lisa, Mark, Anna, Jenny, Ryan
-  - Styles: graceful-sitting, standing, casual, professional
-  - Voices: 400+ Azure Neural Voices with filtering
-  - Backgrounds: solid colors, custom images, transparent
-  - Gestures: wave, nod, thumbs-up, point via SSML
-  - Quality: 720p/1080p video output
-- **Azure Container Apps**: Serverless deployment with auto-scaling
+- **AI Conversation**: GPT-4o and O3-mini model selection for intelligent responses with API version 2024-12-01-preview
+- **Real-Time Avatar Streaming**: WebRTC-based avatar video streaming with Azure-validated configurations:
+  - **Characters**: Lisa, Harry, Jeff, Lori, Meg, Max (Azure Speech SDK validated)
+  - **Styles**: Character-specific real-time compatible styles (Lisa: casual-sitting only)
+  - **Voices**: 400+ Azure Neural Voices with filtering
+  - **Backgrounds**: Solid colors, custom images, transparent
+  - **Gestures**: Wave, nod, thumbs-up, point via SSML
+  - **Quality**: 720p/1080p video output
+- **Azure Container Apps**: Serverless deployment with auto-scaling and managed identity
 - **Authentication**: Simple form-based authentication
 - **Conversation Management**: History, export, and clear functionality
 - **Responsive Design**: Mobile and desktop compatibility
 
-## 🚀 Quick Start
+## 🚀 Quick Start with Azure Developer CLI (AZD)
+
+### Prerequisites
+
+- **Azure Subscription** with permissions to create resources
+- **Azure CLI** installed and authenticated
+- **Azure Developer CLI (AZD)** installed
+- **Docker** (for container operations)
+- **Git** (for repository cloning)
+
+### 1. Install Required Tools
+
+```bash
+# Install Azure CLI (if not already installed)
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# Install Azure Developer CLI
+curl -fsSL https://aka.ms/install-azd.sh | bash
+
+# Verify installations
+az version
+azd version
+```
+
+### 2. Clone and Initialize
+
+```bash
+# Clone the repository
+git clone https://github.com/ddgoad/ai-avatar.git
+cd ai-avatar
+
+# Initialize AZD environment
+azd init
+```
+
+### 3. Configure Azure Services
+
+Before deployment, ensure you have:
+- **Azure OpenAI** resource with GPT-4o and O3-mini deployments
+- **Azure Speech Services** resource (S0 tier recommended)
+
+### 4. Deploy with AZD
+
+```bash
+# Authenticate with Azure
+azd auth login
+
+# Set deployment location (choose region with OpenAI availability)
+azd env set AZURE_LOCATION "eastus2"
+
+# Configure OpenAI settings
+azd env set AZURE_OPENAI_ENDPOINT "https://your-openai-resource.openai.azure.com/"
+azd env set AZURE_OPENAI_GPT4O_DEPLOYMENT "your-gpt4o-deployment-name"
+azd env set AZURE_OPENAI_O3_MINI_DEPLOYMENT "your-o3mini-deployment-name"
+
+# Configure Speech Services
+azd env set AZURE_SPEECH_REGION "eastus2"
+
+# Deploy infrastructure and application
+azd up
+```
+
+The `azd up` command will:
+1. 🏗️ **Provision Azure Resources**: Container Apps, Key Vault, Storage, Application Insights
+2. 🐳 **Build Container Image**: Docker build and push to Azure Container Registry
+3. 🚀 **Deploy Application**: Deploy to Azure Container Apps with managed identity
+4. 🔧 **Configure Secrets**: Securely store credentials in Key Vault
+5. 📊 **Setup Monitoring**: Configure Application Insights and logging
+
+### 5. Access Your Application
+
+After successful deployment, AZD will provide the application URL:
+```
+Your application is available at: https://your-app-name.azurecontainerapps.io
+```
+
+### 6. Manage and Monitor
+
+```bash
+# Check application status
+azd show
+
+# View application logs
+azd logs
+
+# Monitor in Azure portal
+azd show --output json | jq -r '.services.web.resourceName'
+
+# Update environment variables
+azd env set NEW_VARIABLE "value"
+azd deploy  # Apply changes
+```
+
+## 🛠️ Local Development
 
 ### Prerequisites
 
 - Python 3.11+
-- Azure subscription with:
-  - Azure Speech Services (S0 tier)
-  - Azure OpenAI with GPT-4o and O3-mini deployments
-  - Azure Container Apps (for deployment)
+- Azure subscription with configured services
 
-### Local Development
+### Setup
 
 1. **Clone the repository**
    ```bash
@@ -48,10 +138,22 @@ A comprehensive Flask-based AI Avatar application that integrates Azure Text-to-
    playwright install
    ```
 
-4. **Configure environment**
+4. **Configure environment variables**
+   Create a `.env` file with your Azure service credentials:
    ```bash
-   cp .env.example .env
-   # Edit .env with your Azure service keys
+   # Azure OpenAI Configuration
+   AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
+   AZURE_OPENAI_KEY=your-openai-key
+   AZURE_OPENAI_API_VERSION=2024-12-01-preview
+   AZURE_OPENAI_GPT4O_DEPLOYMENT=your-gpt4o-deployment
+   AZURE_OPENAI_O3_MINI_DEPLOYMENT=your-o3mini-deployment
+
+   # Azure Speech Services Configuration
+   AZURE_SPEECH_KEY=your-speech-key
+   AZURE_SPEECH_REGION=eastus2
+
+   # Application Configuration
+   FLASK_SECRET_KEY=your-secret-key
    ```
 
 5. **Run the application**
@@ -260,70 +362,78 @@ Automated deployment pipeline with GitHub Actions:
 - Ensure responsive design compatibility
 - Update documentation for API changes
 
+## � Troubleshooting
+
+### Common Issues
+
+#### 1. O3-mini Model Not Found
+**Error**: `Connection Error: Model o3-mini is enabled only for api versions 2024-12-01-preview and later`
+
+**Solution**: Ensure you're using the correct API version:
+```bash
+azd env set AZURE_OPENAI_API_VERSION "2024-12-01-preview"
+azd deploy
+```
+
+#### 2. Avatar Configuration Lockup
+**Error**: Avatar interface becomes unresponsive when changing character/style
+
+**Solution**: The application now uses Azure-validated character/style combinations. Lisa only supports 'casual-sitting' for real-time synthesis.
+
+#### 3. WebRTC Connection Issues
+**Error**: Avatar video not streaming
+
+**Solution**: Check browser permissions for camera/microphone and ensure HTTPS is enabled in production.
+
+#### 4. Deployment Failures
+**Error**: AZD deployment fails
+
+**Solution**: 
+```bash
+# Check Azure CLI authentication
+az account show
+
+# Verify permissions
+az group list
+
+# Check resource availability in your region
+azd env set AZURE_LOCATION "eastus2"
+```
+
+#### 5. Container App Start Issues
+**Error**: Application fails to start
+
+**Solution**: Check Application Insights logs:
+```bash
+azd logs --follow
+```
+
+### Getting Help
+
+- **Documentation**: See `docs/technical-design-document.md` for detailed architecture
+- **Azure Support**: Use Azure portal for service-specific issues
+- **GitHub Issues**: Report bugs and request features
+- **Logs**: Use `azd logs` for deployment debugging
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## 🆘 Support Resources
 
-- **Documentation**: Technical Design Document in `docs/`
-- **Issues**: GitHub Issues for bug reports and feature requests
-- **Azure Support**: Azure portal for service-specific issues
+- **Azure OpenAI**: [Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
+- **Azure Speech Services**: [Documentation](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/)
+- **Azure Container Apps**: [Documentation](https://learn.microsoft.com/en-us/azure/container-apps/)
+- **Azure Developer CLI**: [Documentation](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
 
 ## 🙏 Acknowledgments
 
 - **Azure AI Services**: For powerful speech and OpenAI capabilities
 - **Microsoft**: For Azure Container Apps platform
+- **Azure Developer CLI**: For streamlined deployment automation
 - **Open Source Community**: For excellent Python and web frameworks
 
 ---
 
-**Built with** ❤️ **using Azure AI Services and Container Apps**
+**Built with** ❤️ **using Azure AI Services, Container Apps, and Developer CLI**
 
-## Features
-
-- 🤖 AI-powered text-to-speech avatars using Azure AI Services
-- 🎭 Multiple avatar characters and styles
-- �️ Natural voice synthesis with customizable speech parameters
-- 🌐 Web-based interface built with Flask
-- ☁️ Azure AI Services integration
-- 🎨 Customizable avatar appearance and backgrounds
-
-## Quick Start
-
-1. Copy `.env.example` to `.env` and configure your Azure keys
-2. Install dependencies: `pip install -r requirements.txt`
-3. Run the Flask app: `python src/app.py`
-4. Open your browser to `http://localhost:5000`
-
-## Development
-
-This project uses a dev container for consistent development environments.
-Open in VS Code and select "Reopen in Container" when prompted.
-
-## Configuration
-
-Configure your Azure AI Services in the `.env` file:
-- `AZURE_SPEECH_KEY` - Your Azure Speech Services key
-- `AZURE_SPEECH_REGION` - Your Azure Speech Services region
-- `AVATAR_CHARACTER` - Avatar character (e.g., lisa, anna)
-- `TTS_VOICE` - Voice to use (e.g., en-US-JennyNeural)
-
-## Architecture
-
-- `src/api/` - Flask API endpoints
-- `src/avatar/` - Avatar management and configuration
-- `src/speech/` - Azure Speech Services integration
-- `src/utils/` - Utility functions and helpers
-- `templates/` - HTML templates
-- `static/` - CSS, JavaScript, and assets
-
-## Azure AI Services
-
-This project uses Azure AI Services Text-to-Speech Avatar:
-- [Documentation](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/what-is-text-to-speech-avatar)
-- [API Reference](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/text-to-speech-avatar-quickstart)
-
-## License
-
-MIT License

@@ -21,10 +21,11 @@ Based on analysis of Azure's official samples (https://github.com/Azure-Samples/
 4. **Session Control**: Frontend controls start/stop of avatar sessions and speech synthesis
 
 ### Updated Architecture Components
-- **JavaScript Frontend**: Manages WebRTC connections, avatar sessions, and real-time video display
-- **Python Backend**: Provides REST API for ICE tokens, session management, and OpenAI integration
-- **Azure Avatar Service**: Real-time WebRTC-based avatar synthesis (not file-based)
-- **No Video Storage**: Videos stream directly via WebRTC, eliminating need for Azure Blob Storage for avatar videos
+- **JavaScript Frontend**: Manages WebRTC connections, avatar sessions, and real-time video display with Azure-validated character/style combinations
+- **Python Backend**: Provides REST API for ICE tokens, session management, and OpenAI integration with o3-mini support using API version 2024-12-01-preview
+- **Azure Avatar Service**: Real-time WebRTC-based avatar synthesis with validated character/style matrix
+- **Azure Container Apps**: Serverless deployment with auto-scaling and managed identity authentication
+- **Azure Developer CLI**: Infrastructure provisioning and deployment automation
 
 ## Architecture Overview
 
@@ -239,8 +240,14 @@ graph TB
 - **Voice Integration**: Supports 90+ languages and 100+ locales
 - **Gesture Support**: SSML-based gesture insertion using bookmark elements
 - **Customizable Options**:
-  - **Character Selection**: Multiple prebuilt avatar characters (lisa, mark, anna, etc.)
-  - **Style Variations**: Different poses and expressions (graceful-sitting, standing, casual, professional)
+  - **Character Selection**: Azure-validated avatar characters (lisa, harry, jeff, lori, meg, max)
+  - **Style Variations**: Real-time compatible styles with character-specific limitations:
+    - Lisa: casual-sitting only (for real-time synthesis)
+    - Harry: business, casual, youthful
+    - Jeff: business, formal
+    - Lori: casual, formal
+    - Meg: formal, casual, business
+    - Max: business, casual, formal
   - **Background Options**: Solid colors, custom images, or transparent backgrounds
   - **Video Quality**: Adjustable bitrate and codec selection
   - **Voice Selection**: Choose from 400+ neural voices across languages
@@ -251,10 +258,10 @@ graph TB
 from azure.cognitiveservices.speech import SpeechSynthesizer
 from azure.cognitiveservices.speech.avatar import AvatarSynthesizer
 
-# Enhanced Avatar Configuration
+# Enhanced Avatar Configuration (Azure-Validated)
 avatar_config = {
-    "character": "lisa",  # Options: lisa, mark, anna, jenny, ryan, etc.
-    "style": "graceful-sitting",  # Options: graceful-sitting, standing, casual, professional
+    "character": "lisa",  # Validated options: lisa, harry, jeff, lori, meg, max
+    "style": "casual-sitting",  # Lisa-compatible style (real-time synthesis)
     "background": {
         "type": "color",  # Options: color, image, transparent
         "value": "#FFFFFFFF"  # Color hex or image URL
@@ -265,6 +272,16 @@ avatar_config = {
         "bitrate": 2000000,  # Adjustable bitrate
         "quality": "high"  # Options: low, medium, high
     }
+}
+
+# Character/Style Compatibility Matrix (Real-time Synthesis)
+character_style_matrix = {
+    'lisa': ['casual-sitting'],  # Only casual-sitting for real-time
+    'harry': ['business', 'casual', 'youthful'],
+    'jeff': ['business', 'formal'],
+    'lori': ['casual', 'formal'],  # graceful not in real-time
+    'meg': ['formal', 'casual', 'business'],
+    'max': ['business', 'casual', 'formal']
 }
 
 # Synthesis with gesture support
@@ -350,13 +367,13 @@ def generate_avatar_video(text, model_choice):
 
 #### 4. OpenAI Integration Module (`src/openai/`)
 ```python
-# Azure OpenAI integration with model selection
+# Azure OpenAI integration with model selection and latest API version
 class OpenAIService:
     def __init__(self):
         self.client = AzureOpenAI(
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
             api_key=os.getenv("AZURE_OPENAI_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+            api_version="2024-12-01-preview"  # Required for o3-mini model support
         )
         self.models = {
             'gpt4o': os.getenv("AZURE_OPENAI_GPT4O_DEPLOYMENT"),
@@ -392,15 +409,28 @@ class OpenAIService:
 
 #### 5. Avatar Management Module (`src/avatar/`)
 ```python
-# Enhanced Avatar configuration and management
+# Enhanced Avatar configuration and management (Azure-Validated)
 class AvatarManager:
     def __init__(self):
+        # Azure-validated character options for real-time synthesis
         self.available_characters = [
             {'id': 'lisa', 'name': 'Lisa', 'description': 'Professional female avatar'},
-            {'id': 'mark', 'name': 'Mark', 'description': 'Professional male avatar'},
-            {'id': 'anna', 'name': 'Anna', 'description': 'Casual female avatar'},
-            {'id': 'jenny', 'name': 'Jenny', 'description': 'Friendly female avatar'},
-            {'id': 'ryan', 'name': 'Ryan', 'description': 'Young male avatar'}
+            {'id': 'harry', 'name': 'Harry', 'description': 'Professional male avatar'},
+            {'id': 'jeff', 'name': 'Jeff', 'description': 'Business male avatar'},
+            {'id': 'lori', 'name': 'Lori', 'description': 'Friendly female avatar'},
+            {'id': 'meg', 'name': 'Meg', 'description': 'Professional female avatar'},
+            {'id': 'max', 'name': 'Max', 'description': 'Business male avatar'}
+        ]
+        
+        # Character/Style compatibility matrix for real-time synthesis
+        self.character_style_matrix = {
+            'lisa': ['casual-sitting'],  # Only casual-sitting for real-time
+            'harry': ['business', 'casual', 'youthful'],
+            'jeff': ['business', 'formal'],
+            'lori': ['casual', 'formal'],
+            'meg': ['formal', 'casual', 'business'],
+            'max': ['business', 'casual', 'formal']
+        }
         ]
         
         self.available_styles = [
@@ -1750,6 +1780,78 @@ azd up
 6. **Speech Service Optimization**: Only use speech-to-text when voice input is selected
 
 ## Deployment Architecture
+
+### Azure Developer CLI (AZD) Deployment
+
+The application uses Azure Developer CLI for streamlined infrastructure provisioning and deployment automation.
+
+#### Prerequisites
+1. **Azure CLI** - Authentication and resource management
+2. **Azure Developer CLI (AZD)** - Infrastructure as Code deployment
+3. **Docker** - Container image building and registry operations
+4. **Azure Subscription** - With appropriate permissions for resource creation
+
+#### AZD Configuration (`azure.yaml`)
+```yaml
+name: ai-avatar
+metadata:
+  template: ai-avatar-containerapp@0.1.0
+
+services:
+  web:
+    project: .
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+
+infra:
+  provider: bicep
+  path: ./infra
+
+pipeline:
+  provider: github
+```
+
+#### Infrastructure Components (Bicep Templates)
+1. **Resource Group** - Logical container for all resources
+2. **Container Apps Environment** - Managed serverless compute environment
+3. **Container Registry** - Private Docker image repository
+4. **Application Insights** - Application performance monitoring
+5. **Key Vault** - Secure credential and secret management
+6. **Storage Account** - Blob storage for assets and logs
+7. **Managed Identity** - Secure service-to-service authentication
+
+#### Deployment Process
+```bash
+# 1. Initialize AZD environment
+azd init
+
+# 2. Authenticate with Azure
+azd auth login
+
+# 3. Set deployment location
+azd env set AZURE_LOCATION "eastus2"
+
+# 4. Configure required environment variables
+azd env set AZURE_OPENAI_ENDPOINT "https://your-openai-resource.openai.azure.com/"
+azd env set AZURE_OPENAI_GPT4O_DEPLOYMENT "gpt-4o"
+azd env set AZURE_OPENAI_O3_MINI_DEPLOYMENT "o3-mini"
+azd env set AZURE_SPEECH_REGION "eastus2"
+
+# 5. Deploy infrastructure and application
+azd up
+```
+
+#### Environment Variables (Managed via Key Vault)
+- `AZURE_OPENAI_ENDPOINT` - OpenAI service endpoint
+- `AZURE_OPENAI_KEY` - OpenAI API key
+- `AZURE_OPENAI_GPT4O_DEPLOYMENT` - GPT-4o deployment name
+- `AZURE_OPENAI_O3_MINI_DEPLOYMENT` - O3-mini deployment name  
+- `AZURE_SPEECH_KEY` - Speech Services key
+- `AZURE_SPEECH_REGION` - Speech Services region
+- `FLASK_SECRET_KEY` - Application session encryption key
 
 ### Production Environment
 - **Primary Region**: East US 2 (for Azure OpenAI availability)
