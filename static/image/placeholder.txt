@@ -1,0 +1,3 @@
+# Placeholder for attachment icon
+# This file should contain the actual attachment icon image
+# For now, this is a placeholder to prevent 404 errors

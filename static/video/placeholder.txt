@@ -1,0 +1,3 @@
+# Placeholder for lisa avatar video
+# This file should contain the actual avatar video for the lisa character in casual-sitting style
+# For now, this is a placeholder to prevent 404 errors

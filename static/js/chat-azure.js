@@ -541,6 +541,14 @@ function handleUserQuery(userQuery, userQueryHTML, imgUrlPath) {
         stream: true
     })
 
+    // Debug logging
+    console.log('OpenAI API Request:', {
+        model: azureOpenAIDeploymentName,
+        endpoint: azureOpenAIEndpoint,
+        url: url,
+        messageCount: messages.length
+    })
+
     // No On Your Data support in simplified UI (dataSources is always empty)
 
     let assistantReply = ''
@@ -558,7 +566,32 @@ function handleUserQuery(userQuery, userQueryHTML, imgUrlPath) {
     })
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Chat API response status: ${response.status} ${response.statusText}`)
+                // Enhanced error handling for better debugging
+                return response.text().then(errorText => {
+                    console.error(`Chat API Error - Status: ${response.status}, Response: ${errorText}`)
+                    
+                    let errorMessage = `Chat API failed with status ${response.status}`
+                    
+                    try {
+                        const errorJson = JSON.parse(errorText)
+                        if (errorJson.error && errorJson.error.message) {
+                            errorMessage = errorJson.error.message
+                        }
+                    } catch (e) {
+                        // If not JSON, use the text response
+                        if (errorText.length > 0 && errorText.length < 200) {
+                            errorMessage += `: ${errorText}`
+                        }
+                    }
+                    
+                    // Show user-friendly error message
+                    let chatHistoryTextArea = document.getElementById('chatHistory')
+                    chatHistoryTextArea.innerHTML += `<br/><br/><span style="color: red; font-weight: bold;">Error:</span> ${errorMessage}<br/>`
+                    chatHistoryTextArea.innerHTML += `<span style="color: #666; font-size: 12px;">Model: ${azureOpenAIDeploymentName} | Check Azure OpenAI deployment configuration</span><br/>`
+                    chatHistoryTextArea.scrollTop = chatHistoryTextArea.scrollHeight
+                    
+                    throw new Error(errorMessage)
+                })
             }
 
             let chatHistoryTextArea = document.getElementById('chatHistory')
@@ -678,6 +711,14 @@ function handleUserQuery(userQuery, userQueryHTML, imgUrlPath) {
             }
 
             messages.push(assistantMessage)
+        })
+        .catch(error => {
+            console.error('OpenAI API Error:', error)
+            
+            let chatHistoryTextArea = document.getElementById('chatHistory')
+            chatHistoryTextArea.innerHTML += `<br/><br/><span style="color: red; font-weight: bold;">Connection Error:</span> ${error.message}<br/>`
+            chatHistoryTextArea.innerHTML += `<span style="color: #666; font-size: 12px;">Please check your internet connection and Azure OpenAI configuration</span><br/>`
+            chatHistoryTextArea.scrollTop = chatHistoryTextArea.scrollHeight
         })
 }
 
