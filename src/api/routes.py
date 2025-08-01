@@ -208,13 +208,21 @@ def chat():
             }
         ])
         
+        # Get direct Azure Blob Storage URL instead of using redirect
+        direct_video_url = None
+        if avatar_video.get('video_id'):
+            direct_video_url = avatar_manager.get_video_path(avatar_video['video_id'])
+            # If it's not a direct URL, fallback to the redirect endpoint
+            if not direct_video_url or not direct_video_url.startswith('http'):
+                direct_video_url = f'/api/video/{avatar_video["video_id"]}'
+        
         response = {
             'text': ai_response['content'],
             'model': model,
             'input_type': input_type,
             'confidence': processed_input['confidence'],
             'tokens_used': ai_response.get('tokens_used', 0),
-            'video_url': f'/api/video/{avatar_video["video_id"]}' if avatar_video.get('video_id') else None,
+            'video_url': direct_video_url,
             'avatar_config': avatar_video.get('config_used', {}),
             'user_input_text': processed_input['text'],  # Include the actual processed text
             'success': True
