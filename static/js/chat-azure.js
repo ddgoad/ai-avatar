@@ -27,36 +27,38 @@ var imgUrl = ""
 
 // Connect to avatar service
 function connectAvatar() {
-    const cogSvcRegion = document.getElementById('region').value
-    const cogSvcSubKey = document.getElementById('APIKey').value
-    if (cogSvcSubKey === '') {
-        alert('Please fill in the API key of your speech resource.')
+    // Prevent connecting if already active or connecting
+    if (sessionActive) {
+        console.log('Avatar session already active')
         return
     }
-
-    const privateEndpointEnabled = document.getElementById('enablePrivateEndpoint').checked
-    const privateEndpoint = document.getElementById('privateEndpoint').value.slice(8)
-    if (privateEndpointEnabled && privateEndpoint === '') {
-        alert('Please fill in the Azure Speech endpoint.')
-        return
-    }
-
-    let speechSynthesisConfig
-    if (privateEndpointEnabled) {
-        speechSynthesisConfig = SpeechSDK.SpeechConfig.fromEndpoint(new URL(`wss://${privateEndpoint}/tts/cognitiveservices/websocket/v1?enableTalkingAvatar=true`), cogSvcSubKey)
+    
+    if (isReconnecting && !userClosedSession) {
+        // Allow reconnection attempts
+        console.log('Attempting to reconnect avatar session...')
     } else {
-        speechSynthesisConfig = SpeechSDK.SpeechConfig.fromSubscription(cogSvcSubKey, cogSvcRegion)
+        // Reset reconnection flag for manual connections
+        isReconnecting = false
     }
+    
+    // Use configuration from window.azureConfig (set during page load)
+    const cogSvcRegion = window.azureConfig?.speech_region || 'southeastasia'
+    const cogSvcSubKey = window.azureConfig?.speech_key
+    
+    if (!cogSvcSubKey) {
+        alert('Azure Speech API key not configured. Please check server configuration.')
+        return
+    }
+
+    // Always use standard endpoint (no private endpoint support in simplified UI)
+    const speechSynthesisConfig = SpeechSDK.SpeechConfig.fromSubscription(cogSvcSubKey, cogSvcRegion)
 
     const ttsVoice = document.getElementById('ttsVoice').value
     speechSynthesisConfig.speechSynthesisVoiceName = ttsVoice
-    speechSynthesisConfig.endpointId = document.getElementById('customVoiceEndpointId').value
 
     const talkingAvatarCharacter = document.getElementById('talkingAvatarCharacter').value
     const talkingAvatarStyle = document.getElementById('talkingAvatarStyle').value
     const avatarConfig = new SpeechSDK.AvatarConfig(talkingAvatarCharacter, talkingAvatarStyle)
-    avatarConfig.customized = document.getElementById('customizedAvatar').checked
-    avatarConfig.useBuiltInVoice = document.getElementById('useBuiltInVoice').checked
     avatarSynthesizer = new SpeechSDK.AvatarSynthesizer(speechSynthesisConfig, avatarConfig)
     avatarSynthesizer.avatarEventReceived = function (s, e) {
         var offsetMessage = ", offset from session start: " + e.offset / 10000 + "ms."
@@ -66,37 +68,30 @@ function connectAvatar() {
         console.log("Event received: " + e.description + offsetMessage)
     }
 
-    let speechRecognitionConfig
-    if (privateEndpointEnabled) {
-        speechRecognitionConfig = SpeechSDK.SpeechConfig.fromEndpoint(new URL(`wss://${privateEndpoint}/stt/speech/universal/v2`), cogSvcSubKey)
-    } else {
-        speechRecognitionConfig = SpeechSDK.SpeechConfig.fromEndpoint(new URL(`wss://${cogSvcRegion}.stt.speech.microsoft.com/speech/universal/v2`), cogSvcSubKey)
-    }
+    // Set up speech recognition with Australian English default
+    const speechRecognitionConfig = SpeechSDK.SpeechConfig.fromEndpoint(
+        new URL(`wss://${cogSvcRegion}.stt.speech.microsoft.com/speech/universal/v2`), 
+        cogSvcSubKey
+    )
     speechRecognitionConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_LanguageIdMode, "Continuous")
-    var sttLocales = document.getElementById('sttLocales').value.split(',')
+    
+    // Use Australian English as default STT locale
+    const sttLocales = [window.azureConfig?.stt_locales || 'en-AU']
     var autoDetectSourceLanguageConfig = SpeechSDK.AutoDetectSourceLanguageConfig.fromLanguages(sttLocales)
     speechRecognizer = SpeechSDK.SpeechRecognizer.FromConfig(speechRecognitionConfig, autoDetectSourceLanguageConfig, SpeechSDK.AudioConfig.fromDefaultMicrophoneInput())
 
-    const azureOpenAIEndpoint = document.getElementById('azureOpenAIEndpoint').value
-    const azureOpenAIApiKey = document.getElementById('azureOpenAIApiKey').value
+    // Use configured Azure OpenAI settings
+    const azureOpenAIEndpoint = window.azureConfig?.openai_endpoint
+    const azureOpenAIApiKey = window.azureConfig?.openai_key
     const azureOpenAIDeploymentName = document.getElementById('azureOpenAIDeploymentName').value
-    if (azureOpenAIEndpoint === '' || azureOpenAIApiKey === '' || azureOpenAIDeploymentName === '') {
-        alert('Please fill in the Azure OpenAI endpoint, API key and deployment name.')
+    
+    if (!azureOpenAIEndpoint || !azureOpenAIApiKey) {
+        alert('Azure OpenAI not configured. Please check server configuration.')
         return
     }
 
+    // No On Your Data support in simplified UI
     dataSources = []
-    if (document.getElementById('enableOyd').checked) {
-        const azureCogSearchEndpoint = document.getElementById('azureCogSearchEndpoint').value
-        const azureCogSearchApiKey = document.getElementById('azureCogSearchApiKey').value
-        const azureCogSearchIndexName = document.getElementById('azureCogSearchIndexName').value
-        if (azureCogSearchEndpoint === "" || azureCogSearchApiKey === "" || azureCogSearchIndexName === "") {
-            alert('Please fill in the Azure Cognitive Search endpoint, API key and index name.')
-            return
-        } else {
-            setDataSources(azureCogSearchEndpoint, azureCogSearchApiKey, azureCogSearchIndexName)
-        }
-    }
 
     // Only initialize messages once
     if (!messageInitiated) {
@@ -108,36 +103,81 @@ function connectAvatar() {
     document.getElementById('configuration').hidden = true
 
     const xhr = new XMLHttpRequest()
-    if (privateEndpointEnabled) {
-        xhr.open("GET", `https://${privateEndpoint}/tts/cognitiveservices/avatar/relay/token/v1`)
-    } else {
-        xhr.open("GET", `https://${cogSvcRegion}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`)
-    }
+    xhr.open("GET", `https://${cogSvcRegion}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`)
     xhr.setRequestHeader("Ocp-Apim-Subscription-Key", cogSvcSubKey)
     xhr.addEventListener("readystatechange", function() {
         if (this.readyState === 4) {
-            const responseData = JSON.parse(this.responseText)
-            const iceServerUrl = responseData.Urls[0]
-            const iceServerUsername = responseData.Username
-            const iceServerCredential = responseData.Password
-            setupWebRTC(iceServerUrl, iceServerUsername, iceServerCredential)
+            if (this.status === 200) {
+                try {
+                    const responseData = JSON.parse(this.responseText)
+                    const iceServerUrl = responseData.Urls[0]
+                    const iceServerUsername = responseData.Username
+                    const iceServerCredential = responseData.Password
+                    setupWebRTC(iceServerUrl, iceServerUsername, iceServerCredential)
+                } catch (error) {
+                    console.error('Failed to parse avatar token response:', error)
+                    alert('Failed to initialize avatar connection. Please try again.')
+                    document.getElementById('startSession').disabled = false
+                    document.getElementById('configuration').hidden = false
+                }
+            } else {
+                console.error('Avatar token request failed:', this.status, this.responseText)
+                alert('Failed to get avatar connection token. Please check your Azure Speech credentials.')
+                document.getElementById('startSession').disabled = false
+                document.getElementById('configuration').hidden = false
+            }
         }
     })
+    xhr.onerror = function() {
+        console.error('Network error during avatar token request')
+        alert('Network error during avatar connection. Please check your internet connection.')
+        document.getElementById('startSession').disabled = false
+        document.getElementById('configuration').hidden = false
+    }
     xhr.send()
 }
 
 // Disconnect from avatar service
 function disconnectAvatar() {
+    console.log('[' + (new Date()).toISOString() + '] Disconnecting avatar session...')
+    
+    // Close avatar synthesizer
     if (avatarSynthesizer !== undefined) {
         avatarSynthesizer.close()
+        avatarSynthesizer = undefined
     }
 
+    // Close speech recognizer
     if (speechRecognizer !== undefined) {
         speechRecognizer.stopContinuousRecognitionAsync()
         speechRecognizer.close()
+        speechRecognizer = undefined
     }
 
+    // Close WebRTC peer connection
+    if (peerConnection !== undefined) {
+        console.log('[' + (new Date()).toISOString() + '] Closing WebRTC peer connection...')
+        peerConnection.close()
+        peerConnection = undefined
+    }
+
+    // Clear data channel
+    if (peerConnectionDataChannel !== undefined) {
+        peerConnectionDataChannel = undefined
+    }
+
+    // Reset connection state
     sessionActive = false
+    isReconnecting = false
+    isSpeaking = false
+    
+    // Clear video and audio elements
+    const remoteVideoDiv = document.getElementById('remoteVideo')
+    if (remoteVideoDiv) {
+        remoteVideoDiv.innerHTML = ''
+    }
+    
+    console.log('[' + (new Date()).toISOString() + '] Avatar session disconnected successfully')
 }
 
 // Setup WebRTC
@@ -248,8 +288,8 @@ function setupWebRTC(iceServerUrl, iceServerUsername, iceServerCredential) {
                 subtitles.hidden = true
                 if (webRTCEvent.event.eventType === 'EVENT_TYPE_SESSION_END') {
                     if (document.getElementById('autoReconnectAvatar').checked && !userClosedSession && !isReconnecting) {
-                        // No longer reconnect when there is no interaction for a while
-                        if (new Date() - lastInteractionTime < 300000) {
+                        // No longer reconnect when there is no interaction for a while - extended to 30 minutes
+                        if (new Date() - lastInteractionTime < 1800000) {
                             // Session disconnected unexpectedly, need reconnect
                             console.log(`[${(new Date()).toISOString()}] The WebSockets got disconnected, need reconnect.`)
                             isReconnecting = true
@@ -491,8 +531,8 @@ function handleUserQuery(userQuery, userQueryHTML, imgUrlPath) {
         speak(getQuickReply(), 2000)
     }
 
-    const azureOpenAIEndpoint = document.getElementById('azureOpenAIEndpoint').value
-    const azureOpenAIApiKey = document.getElementById('azureOpenAIApiKey').value
+    const azureOpenAIEndpoint = window.azureConfig?.openai_endpoint
+    const azureOpenAIApiKey = window.azureConfig?.openai_key
     const azureOpenAIDeploymentName = document.getElementById('azureOpenAIDeploymentName').value
 
     let url = `${azureOpenAIEndpoint}/openai/deployments/${azureOpenAIDeploymentName}/chat/completions?api-version=2023-06-01-preview`
@@ -501,14 +541,7 @@ function handleUserQuery(userQuery, userQueryHTML, imgUrlPath) {
         stream: true
     })
 
-    if (dataSources.length > 0) {
-        url = `${azureOpenAIEndpoint}/openai/deployments/${azureOpenAIDeploymentName}/extensions/chat/completions?api-version=2023-06-01-preview`
-        body = JSON.stringify({
-            dataSources: dataSources,
-            messages: messages,
-            stream: true
-        })
-    }
+    // No On Your Data support in simplified UI (dataSources is always empty)
 
     let assistantReply = ''
     let toolContent = ''
@@ -664,8 +697,8 @@ function checkHung() {
                 if (sessionActive) {
                     sessionActive = false
                     if (document.getElementById('autoReconnectAvatar').checked) {
-                        // No longer reconnect when there is no interaction for a while
-                        if (new Date() - lastInteractionTime < 300000) {
+                        // No longer reconnect when there is no interaction for a while - extended to 30 minutes
+                        if (new Date() - lastInteractionTime < 1800000) {
                             console.log(`[${(new Date()).toISOString()}] The video stream got disconnected, need reconnect.`)
                             isReconnecting = true
                             // Remove data channel onmessage callback to avoid duplicatedly triggering reconnect
@@ -710,6 +743,8 @@ window.onload = () => {
 
 window.startSession = () => {
     lastInteractionTime = new Date()
+    userClosedSession = false  // Reset the flag before starting
+    
     if (document.getElementById('useLocalVideoForIdle').checked) {
         document.getElementById('startSession').disabled = true
         document.getElementById('configuration').hidden = true
@@ -722,7 +757,6 @@ window.startSession = () => {
         return
     }
 
-    userClosedSession = false
     connectAvatar()
 }
 
@@ -816,14 +850,6 @@ window.microphone = () => {
         })
 }
 
-window.updataEnableOyd = () => {
-    if (document.getElementById('enableOyd').checked) {
-        document.getElementById('cogSearchConfig').hidden = false
-    } else {
-        document.getElementById('cogSearchConfig').hidden = true
-    }
-}
-
 window.updateTypeMessageBox = () => {
     if (document.getElementById('showTypeMessage').checked) {
         document.getElementById('userMessageBox').hidden = false
@@ -869,22 +895,5 @@ window.updateLocalVideoForIdle = () => {
         document.getElementById('showTypeMessageCheckbox').hidden = true
     } else {
         document.getElementById('showTypeMessageCheckbox').hidden = false
-    }
-}
-
-window.updatePrivateEndpoint = () => {
-    if (document.getElementById('enablePrivateEndpoint').checked) {
-        document.getElementById('showPrivateEndpointCheckBox').hidden = false
-    } else {
-        document.getElementById('showPrivateEndpointCheckBox').hidden = true
-    }
-}
-
-window.updateCustomAvatarBox = () => {
-    if (document.getElementById('customizedAvatar').checked) {
-        document.getElementById('useBuiltInVoice').disabled = false
-    } else {
-        document.getElementById('useBuiltInVoice').disabled = true
-        document.getElementById('useBuiltInVoice').checked = false
     }
 }
