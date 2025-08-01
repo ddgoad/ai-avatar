@@ -535,7 +535,7 @@ function handleUserQuery(userQuery, userQueryHTML, imgUrlPath) {
     const azureOpenAIApiKey = window.azureConfig?.openai_key
     const azureOpenAIDeploymentName = document.getElementById('azureOpenAIDeploymentName').value
 
-    let url = `${azureOpenAIEndpoint}/openai/deployments/${azureOpenAIDeploymentName}/chat/completions?api-version=2023-06-01-preview`
+    let url = `${azureOpenAIEndpoint}/openai/deployments/${azureOpenAIDeploymentName}/chat/completions?api-version=2024-12-01-preview`
     let body = JSON.stringify({
         messages: messages,
         stream: true
@@ -775,11 +775,50 @@ function checkLastSpeak() {
     }
 }
 
+function handleAvatarConfigChange(configType) {
+    console.log(`[${(new Date()).toISOString()}] Avatar ${configType} configuration changed`)
+    
+    // Only restart if session is currently active and not already reconnecting
+    if (sessionActive && !isReconnecting && !userClosedSession) {
+        console.log(`[${(new Date()).toISOString()}] Restarting avatar session due to ${configType} change...`)
+        
+        // Stop any current speaking
+        if (isSpeaking) {
+            stopSpeaking()
+        }
+        
+        // Mark as reconnecting to prevent duplicate restarts
+        isReconnecting = true
+        
+        // Disconnect current session
+        disconnectAvatar()
+        
+        // Brief delay to ensure cleanup completes before reconnecting
+        setTimeout(() => {
+            console.log(`[${(new Date()).toISOString()}] Reconnecting with new ${configType} configuration...`)
+            connectAvatar()
+        }, 1000)
+    }
+}
+
 window.onload = () => {
     setInterval(() => {
         checkHung()
         checkLastSpeak()
     }, 2000) // Check session activity every 2 seconds
+
+    // Add event listeners for avatar configuration changes
+    document.getElementById('talkingAvatarCharacter').addEventListener('change', () => {
+        handleAvatarConfigChange('character')
+    })
+    
+    document.getElementById('talkingAvatarStyle').addEventListener('change', () => {
+        handleAvatarConfigChange('style')
+    })
+    
+    document.getElementById('ttsVoice').addEventListener('change', () => {
+        handleAvatarConfigChange('voice')
+    })
 }
 
 window.startSession = () => {
