@@ -290,7 +290,13 @@ class ChatInterface {
                 // Play avatar video if available
                 if (response.video_url) {
                     console.log('Playing avatar video for response:', response.video_url);
-                    await this.avatarPlayer.playAvatarVideo(response.video_url);
+                    try {
+                        await this.avatarPlayer.playAvatarVideo(response.video_url);
+                        console.log('Avatar video played successfully');
+                    } catch (videoError) {
+                        console.error('Video playback failed:', videoError);
+                        this.showError(`Video playback failed: ${videoError.message}. The text response is still available above.`);
+                    }
                 } else {
                     console.log('No video URL in response');
                 }
@@ -610,9 +616,9 @@ class AvatarPlayer {
             
             console.log('Starting video fetch from:', videoUrl);
             
-            // First, get the redirect URL from our API
+            // Use GET request with manual redirect handling
             const response = await fetch(videoUrl, {
-                method: 'HEAD',  // Use HEAD to get just headers
+                method: 'GET',
                 redirect: 'manual'  // Don't follow redirects automatically
             });
             
@@ -631,13 +637,20 @@ class AvatarPlayer {
                 // Fetch the video directly from Azure Blob Storage
                 console.log('Fetching video blob from Azure Storage:', redirectUrl);
                 const blobResponse = await fetch(redirectUrl, {
+                    method: 'GET',
                     mode: 'cors',
-                    credentials: 'omit'
+                    credentials: 'omit',
+                    headers: {
+                        'Accept': 'video/*'
+                    }
                 });
                 
                 if (!blobResponse.ok) {
                     throw new Error(`Failed to fetch video blob from Azure: ${blobResponse.status} ${blobResponse.statusText}`);
                 }
+                
+                const contentType = blobResponse.headers.get('Content-Type');
+                console.log('Content-Type from Azure:', contentType);
                 
                 const videoBlob = await blobResponse.blob();
                 console.log('Video blob loaded, size:', videoBlob.size, 'type:', videoBlob.type);
@@ -649,47 +662,68 @@ class AvatarPlayer {
             } else if (response.status === 200) {
                 // Direct response, fetch the full content
                 console.log('Direct response, fetching video content');
-                const videoResponse = await fetch(videoUrl);
-                const videoBlob = await videoResponse.blob();
+                const videoBlob = await response.blob();
+                console.log('Video blob loaded directly, size:', videoBlob.size, 'type:', videoBlob.type);
                 
                 this.currentVideoUrl = URL.createObjectURL(videoBlob);
                 this.video.src = this.currentVideoUrl;
                 
             } else {
-                throw new Error(`Unexpected response status: ${response.status}`);
+                throw new Error(`Unexpected response status: ${response.status} ${response.statusText}`);
             }
             
-            // Set up event listeners for video loading
-            const handleLoadedData = () => {
-                console.log('Video loaded, starting playback');
-                this.showVideoLoading(false);
-            };
-            
-            const handleError = (e) => {
-                console.error('Video element error:', e);
-                this.showVideoLoading(false);
-                throw new Error('Video element failed to load');
-            };
-            
-            this.video.addEventListener('loadeddata', handleLoadedData, { once: true });
-            this.video.addEventListener('error', handleError, { once: true });
-            
-            // Load the video
-            this.video.load();
-            
-            // Wait for it to be ready and play
-            await new Promise((resolve, reject) => {
-                const handleCanPlay = () => {
-                    this.video.removeEventListener('error', reject);
-                    resolve();
+            // Wait for video to load and play
+            return new Promise((resolve, reject) => {
+                let resolved = false;
+                
+                const handleLoadedData = () => {
+                    console.log('Video loaded successfully');
+                    this.showVideoLoading(false);
+                    if (!resolved) {
+                        resolved = true;
+                        this.video.play().then(resolve).catch(reject);
+                    }
                 };
                 
+                const handleCanPlay = () => {
+                    console.log('Video can play');
+                    this.showVideoLoading(false);
+                    if (!resolved) {
+                        resolved = true;
+                        this.video.play().then(resolve).catch(reject);
+                    }
+                };
+                
+                const handleError = (e) => {
+                    console.error('Video element error:', e);
+                    this.showVideoLoading(false);
+                    if (!resolved) {
+                        resolved = true;
+                        reject(new Error(`Video element failed to load: ${e.message || 'Unknown error'}`));
+                    }
+                };
+                
+                const handleLoadStart = () => {
+                    console.log('Video load started');
+                };
+                
+                // Set up event listeners
+                this.video.addEventListener('loadeddata', handleLoadedData, { once: true });
                 this.video.addEventListener('canplay', handleCanPlay, { once: true });
-                this.video.addEventListener('error', reject, { once: true });
+                this.video.addEventListener('error', handleError, { once: true });
+                this.video.addEventListener('loadstart', handleLoadStart, { once: true });
+                
+                // Start loading
+                this.video.load();
+                
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        reject(new Error('Video loading timeout after 30 seconds'));
+                    }
+                }, 30000);
             });
-            
-            await this.video.play();
-            console.log('Avatar video playing successfully');
             
         } catch (error) {
             console.error('Failed to play avatar video:', error);
@@ -704,6 +738,8 @@ class AvatarPlayer {
                     errorDiv.style.display = 'none';
                 }, 8000);
             }
+            
+            throw error; // Re-throw for calling code
         }
     }
     

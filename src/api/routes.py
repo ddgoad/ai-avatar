@@ -301,9 +301,20 @@ def avatar_config():
             return jsonify({'error': 'Failed to update avatar configuration'}), 500
 
 # Video serving endpoint as specified in TDD
-@api_bp.route('/video/<video_id>')
+@api_bp.route('/video/<video_id>', methods=['GET', 'HEAD', 'OPTIONS'])
 def get_video(video_id):
     """Serve generated avatar videos as specified in TDD"""
+    # Handle OPTIONS requests for CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = (
+            'Content-Type, Accept'
+        )
+        response.headers['Access-Control-Max-Age'] = '3600'
+        return response
+    
     if not is_authenticated(session):
         return jsonify({'error': 'Not authenticated'}), 401
     
@@ -317,24 +328,42 @@ def get_video(video_id):
             # Redirect to Azure Blob Storage URL with proper CORS headers
             response = make_response(redirect(video_path))
             response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-            response.headers['Access-Control-Expose-Headers'] = 'Location'
+            response.headers['Access-Control-Allow-Methods'] = (
+                'GET, HEAD, OPTIONS'
+            )
+            response.headers['Access-Control-Allow-Headers'] = (
+                'Content-Type, Accept'
+            )
+            response.headers['Access-Control-Expose-Headers'] = (
+                'Location, Content-Type, Content-Length'
+            )
             
-            logger.info(f"Redirecting video {video_id} to Azure Blob Storage: {video_path}")
+            logger.info(
+                f"Redirecting video {video_id} to Azure Blob Storage: "
+                f"{video_path}"
+            )
             return response
         else:
             # Serve local file
             if not os.path.exists(video_path):
                 return jsonify({'error': 'Video file not found'}), 404
             
-            response = make_response(send_file(video_path, mimetype='video/mp4'))
+            response = make_response(
+                send_file(video_path, mimetype='video/mp4')
+            )
             response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = (
+                'GET, HEAD, OPTIONS'
+            )
+            response.headers['Access-Control-Allow-Headers'] = (
+                'Content-Type, Accept'
+            )
             return response
         
     except Exception as e:
         logger.error(f"Video serving error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 # Conversation management as specified in TDD
 @api_bp.route('/conversation', methods=['GET', 'DELETE'])
@@ -355,7 +384,9 @@ def conversation_management():
     elif request.method == 'DELETE':
         try:
             session['conversation'] = []
-            logger.info(f"Conversation cleared for user {session.get('username')}")
+            logger.info(
+                f"Conversation cleared for user {session.get('username')}"
+            )
             return jsonify({'success': True})
             
         except Exception as e:
