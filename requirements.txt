@@ -7,7 +7,8 @@ Flask-CORS>=4.0.0
 gunicorn>=21.0.0
 
 # Azure AI Services
-azure-cognitiveservices-speech>=1.32.0
+azure-cognitiveservices-speech>=1.40.0
+azure-cognitiveservices-speech[avatar]>=1.40.0
 openai>=1.0.0
 azure-storage-blob>=12.17.0
 azure-keyvault-secrets>=4.7.0

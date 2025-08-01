@@ -55,6 +55,17 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01
     deleteRetentionPolicy: {
       enabled: false
     }
+    cors: {
+      corsRules: [
+        {
+          allowedOrigins: ['*']
+          allowedMethods: ['GET', 'HEAD', 'OPTIONS']
+          allowedHeaders: ['*']
+          exposedHeaders: ['*']
+          maxAgeInSeconds: 3600
+        }
+      ]
+    }
   }
 }
 
@@ -62,7 +73,7 @@ resource storageContainers 'Microsoft.Storage/storageAccounts/blobServices/conta
   name: container
   parent: blobServices
   properties: {
-    publicAccess: 'None'
+    publicAccess: 'None' // Keep private, we'll use SAS tokens or authenticated access
   }
 }]
 

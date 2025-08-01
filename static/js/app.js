@@ -290,20 +290,43 @@ class ChatInterface {
                 // Play avatar video if available
                 if (response.video_url) {
                     console.log('Playing avatar video for response:', response.video_url);
-                    try {
-                        await this.avatarPlayer.playAvatarVideo(response.video_url);
-                        console.log('Avatar video played successfully');
-                    } catch (videoError) {
-                        console.error('Primary video playback failed:', videoError);
-                        
-                        // Try fallback method - direct video URL assignment
+                    
+                    // For Azure Blob Storage URLs, use direct method first since they're public
+                    if (response.video_url.includes('blob.core.windows.net')) {
                         try {
-                            console.log('Attempting fallback video loading method...');
+                            console.log('Using direct URL method for Azure Blob Storage...');
                             await this.avatarPlayer.playVideoDirectly(response.video_url);
-                            console.log('Fallback video playback succeeded');
-                        } catch (fallbackError) {
-                            console.error('Fallback video playback also failed:', fallbackError);
-                            this.showError(`Video playback failed: ${videoError.message}. Please try refreshing the page. The text response is available above.`);
+                            console.log('Direct video playback succeeded');
+                        } catch (directError) {
+                            console.error('Direct video playback failed:', directError);
+                            
+                            // Fallback to fetch method
+                            try {
+                                console.log('Attempting fetch method as fallback...');
+                                await this.avatarPlayer.playAvatarVideo(response.video_url);
+                                console.log('Fetch method succeeded');
+                            } catch (fetchError) {
+                                console.error('Both video methods failed:', fetchError);
+                                this.showError(`Video playback failed: ${directError.message}. Please try refreshing the page. The text response is available above.`);
+                            }
+                        }
+                    } else {
+                        // For other URLs, use fetch method first
+                        try {
+                            await this.avatarPlayer.playAvatarVideo(response.video_url);
+                            console.log('Avatar video played successfully');
+                        } catch (videoError) {
+                            console.error('Primary video playback failed:', videoError);
+                            
+                            // Try fallback method - direct video URL assignment
+                            try {
+                                console.log('Attempting fallback video loading method...');
+                                await this.avatarPlayer.playVideoDirectly(response.video_url);
+                                console.log('Fallback video playback succeeded');
+                            } catch (fallbackError) {
+                                console.error('Fallback video playback also failed:', fallbackError);
+                                this.showError(`Video playback failed: ${videoError.message}. Please try refreshing the page. The text response is available above.`);
+                            }
                         }
                     }
                 } else {
@@ -759,41 +782,94 @@ class AvatarPlayer {
             // Directly assign the URL to the video element
             this.video.src = videoUrl;
             
+            let hasResolved = false;
+            
+            const cleanup = () => {
+                this.video.removeEventListener('loadeddata', onLoadedData);
+                this.video.removeEventListener('canplay', onCanPlay);
+                this.video.removeEventListener('error', onError);
+                this.video.removeEventListener('ended', onEnded);
+            };
+            
+            const resolveOnce = (result) => {
+                if (!hasResolved) {
+                    hasResolved = true;
+                    this.showVideoLoading(false);
+                    cleanup();
+                    resolve(result);
+                }
+            };
+            
+            const rejectOnce = (error) => {
+                if (!hasResolved) {
+                    hasResolved = true;
+                    this.showVideoLoading(false);
+                    cleanup();
+                    reject(error);
+                }
+            };
+            
             const onLoadedData = () => {
-                console.log('Direct video loading successful');
+                console.log('Direct video loading successful, attempting to play...');
                 this.video.play()
                     .then(() => {
-                        console.log('Direct video playing');
-                        this.showVideoLoading(false);
+                        console.log('Direct video playing successfully');
                     })
                     .catch(playError => {
                         console.error('Direct video play failed:', playError);
-                        this.showVideoLoading(false);
-                        reject(new Error(`Play failed: ${playError.message}`));
+                        rejectOnce(new Error(`Play failed: ${playError.message}`));
                     });
+            };
+            
+            const onCanPlay = () => {
+                console.log('Direct video can play');
+                // Video is ready but let's wait for play to succeed
             };
             
             const onError = (e) => {
                 console.error('Direct video loading error:', e);
-                this.showVideoLoading(false);
-                reject(new Error('Direct video loading failed'));
+                const videoError = this.video.error;
+                let errorMessage = 'Direct video loading failed';
+                
+                if (videoError) {
+                    switch (videoError.code) {
+                        case videoError.MEDIA_ERR_ABORTED:
+                            errorMessage = 'Video loading was aborted';
+                            break;
+                        case videoError.MEDIA_ERR_NETWORK:
+                            errorMessage = 'Network error while loading video';
+                            break;
+                        case videoError.MEDIA_ERR_DECODE:
+                            errorMessage = 'Video decode error';
+                            break;
+                        case videoError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            errorMessage = 'Video format not supported';
+                            break;
+                        default:
+                            errorMessage = `Video error: ${videoError.message || 'Unknown error'}`;
+                    }
+                }
+                
+                rejectOnce(new Error(errorMessage));
             };
             
             const onEnded = () => {
                 console.log('Direct video playback ended');
-                resolve();
+                resolveOnce();
             };
             
+            // Add event listeners
             this.video.addEventListener('loadeddata', onLoadedData, { once: true });
+            this.video.addEventListener('canplay', onCanPlay, { once: true });
             this.video.addEventListener('error', onError, { once: true });
             this.video.addEventListener('ended', onEnded, { once: true });
             
             // Start loading
             this.video.load();
             
-            // Timeout
+            // Timeout with more reasonable duration
             setTimeout(() => {
-                reject(new Error('Direct video loading timeout'));
+                rejectOnce(new Error('Direct video loading timeout (15s)'));
             }, 15000);
         });
     }
