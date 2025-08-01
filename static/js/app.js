@@ -289,13 +289,19 @@ class ChatInterface {
                 
                 // Play avatar video if available
                 if (response.video_url) {
+                    console.log('Playing avatar video for response:', response.video_url);
                     await this.avatarPlayer.playAvatarVideo(response.video_url);
+                } else {
+                    console.log('No video URL in response');
                 }
                 
-                // Update conversation history
+                // Update conversation history - use the transcribed text for voice input
+                const userContent = response.user_input_text || 
+                    (input.type === 'text' ? input.data : 'Voice message');
+                
                 this.conversationHistory.push(
-                    { role: 'user', content: input.data, input_type: input.type },
-                    { role: 'assistant', content: response.text, model_used: response.model }
+                    { role: 'user', content: userContent },
+                    { role: 'assistant', content: response.text }
                 );
             } else {
                 this.showError(response.error || 'Failed to get response');
@@ -595,21 +601,109 @@ class AvatarPlayer {
         if (!this.video) return;
         
         try {
+            this.showVideoLoading(true);
+            
             // Clean up previous video URL
             if (this.currentVideoUrl) {
                 URL.revokeObjectURL(this.currentVideoUrl);
             }
             
-            this.video.src = videoUrl;
-            this.currentVideoUrl = videoUrl;
+            console.log('Starting video fetch from:', videoUrl);
             
-            // Wait for video to be ready and play
+            // First, get the redirect URL from our API
+            const response = await fetch(videoUrl, {
+                method: 'HEAD',  // Use HEAD to get just headers
+                redirect: 'manual'  // Don't follow redirects automatically
+            });
+            
+            console.log('Response status:', response.status);
+            console.log('Response headers:', [...response.headers.entries()]);
+            
+            if (response.status === 302 || response.status === 301) {
+                // Get the redirect location
+                const redirectUrl = response.headers.get('Location');
+                console.log('Redirect URL found:', redirectUrl);
+                
+                if (!redirectUrl) {
+                    throw new Error('Redirect URL not found in response headers');
+                }
+                
+                // Fetch the video directly from Azure Blob Storage
+                console.log('Fetching video blob from Azure Storage:', redirectUrl);
+                const blobResponse = await fetch(redirectUrl, {
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                
+                if (!blobResponse.ok) {
+                    throw new Error(`Failed to fetch video blob from Azure: ${blobResponse.status} ${blobResponse.statusText}`);
+                }
+                
+                const videoBlob = await blobResponse.blob();
+                console.log('Video blob loaded, size:', videoBlob.size, 'type:', videoBlob.type);
+                
+                // Create blob URL and set video source
+                this.currentVideoUrl = URL.createObjectURL(videoBlob);
+                this.video.src = this.currentVideoUrl;
+                
+            } else if (response.status === 200) {
+                // Direct response, fetch the full content
+                console.log('Direct response, fetching video content');
+                const videoResponse = await fetch(videoUrl);
+                const videoBlob = await videoResponse.blob();
+                
+                this.currentVideoUrl = URL.createObjectURL(videoBlob);
+                this.video.src = this.currentVideoUrl;
+                
+            } else {
+                throw new Error(`Unexpected response status: ${response.status}`);
+            }
+            
+            // Set up event listeners for video loading
+            const handleLoadedData = () => {
+                console.log('Video loaded, starting playback');
+                this.showVideoLoading(false);
+            };
+            
+            const handleError = (e) => {
+                console.error('Video element error:', e);
+                this.showVideoLoading(false);
+                throw new Error('Video element failed to load');
+            };
+            
+            this.video.addEventListener('loadeddata', handleLoadedData, { once: true });
+            this.video.addEventListener('error', handleError, { once: true });
+            
+            // Load the video
+            this.video.load();
+            
+            // Wait for it to be ready and play
+            await new Promise((resolve, reject) => {
+                const handleCanPlay = () => {
+                    this.video.removeEventListener('error', reject);
+                    resolve();
+                };
+                
+                this.video.addEventListener('canplay', handleCanPlay, { once: true });
+                this.video.addEventListener('error', reject, { once: true });
+            });
+            
             await this.video.play();
+            console.log('Avatar video playing successfully');
             
-            console.log('Avatar video playing:', videoUrl);
         } catch (error) {
             console.error('Failed to play avatar video:', error);
             this.showVideoLoading(false);
+            
+            // Show user-friendly error with more details
+            const errorDiv = document.getElementById('error-message');
+            if (errorDiv) {
+                errorDiv.textContent = `Failed to load avatar video: ${error.message}`;
+                errorDiv.style.display = 'block';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 8000);
+            }
         }
     }
     

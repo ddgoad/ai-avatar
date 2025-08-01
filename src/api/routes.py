@@ -9,7 +9,7 @@ import os
 import json
 import logging
 from datetime import datetime
-from flask import Blueprint, request, jsonify, session, send_file, make_response
+from flask import Blueprint, request, jsonify, session, send_file, make_response, redirect
 from werkzeug.utils import secure_filename
 
 from src.auth.auth_manager import authenticate_user, is_authenticated, clear_session
@@ -106,14 +106,25 @@ def chat():
             if not input_processor:
                 return jsonify({'error': 'Speech service not available'}), 503
                 
-            # Use synchronous processing for now
-            processed_input = {
-                'text': 'Voice input processed (speech service placeholder)',
-                'confidence': 0.9,
-                'input_type': 'voice',
-                'success': True,
-                'error': None
-            }
+            # Process voice input with Azure Speech Service
+            import asyncio
+            try:
+                # Run async transcription
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                processed_input = loop.run_until_complete(
+                    input_processor.process_voice_input(audio_data)
+                )
+                loop.close()
+            except Exception as e:
+                logger.error(f"Voice processing error: {str(e)}")
+                processed_input = {
+                    'text': '',
+                    'confidence': 0.0,
+                    'input_type': 'voice',
+                    'success': False,
+                    'error': f'Voice processing failed: {str(e)}'
+                }
         
         elif input_type == 'text':
             text = request.form.get('text')
@@ -154,12 +165,27 @@ def chat():
             )
         
         # Generate avatar video with user settings
-        # Use synchronous processing for now
-        avatar_video = {
-            'video_id': 'demo-video-123',
-            'config_used': avatar_settings,
-            'success': True
-        }
+        try:
+            # Use asyncio to run the avatar generation
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            avatar_video = loop.run_until_complete(
+                avatar_manager.create_avatar_video(
+                    ai_response['content'], 
+                    avatar_settings
+                )
+            )
+            loop.close()
+        except Exception as e:
+            logger.warning(f"Avatar video generation failed: {str(e)}")
+            # Return error instead of demo video fallback
+            avatar_video = {
+                'video_id': None,
+                'config_used': avatar_settings,
+                'success': False,
+                'error': str(e)
+            }
         
         # Store conversation in session
         if 'conversation' not in session:
@@ -190,6 +216,7 @@ def chat():
             'tokens_used': ai_response.get('tokens_used', 0),
             'video_url': f'/api/video/{avatar_video["video_id"]}' if avatar_video.get('video_id') else None,
             'avatar_config': avatar_video.get('config_used', {}),
+            'user_input_text': processed_input['text'],  # Include the actual processed text
             'success': True
         }
         
@@ -282,10 +309,28 @@ def get_video(video_id):
     
     try:
         video_path = avatar_manager.get_video_path(video_id)
-        if not video_path or not os.path.exists(video_path):
+        if not video_path:
             return jsonify({'error': 'Video not found'}), 404
         
-        return send_file(video_path, mimetype='video/mp4')
+        # Check if it's a URL (Azure Blob Storage) or local path
+        if video_path.startswith('http'):
+            # Redirect to Azure Blob Storage URL with proper CORS headers
+            response = make_response(redirect(video_path))
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            response.headers['Access-Control-Expose-Headers'] = 'Location'
+            
+            logger.info(f"Redirecting video {video_id} to Azure Blob Storage: {video_path}")
+            return response
+        else:
+            # Serve local file
+            if not os.path.exists(video_path):
+                return jsonify({'error': 'Video file not found'}), 404
+            
+            response = make_response(send_file(video_path, mimetype='video/mp4'))
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
         
     except Exception as e:
         logger.error(f"Video serving error: {str(e)}")
