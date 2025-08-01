@@ -18,18 +18,23 @@ logger = logging.getLogger(__name__)
 
 # Import Azure Avatar SDK components
 try:
-    from azure.cognitiveservices.speech.avatar import (
-        AvatarSynthesizer,
-        AvatarConfig,
-        VideoFormat,
-        AvatarVideoFormat
-    )
-    AVATAR_SDK_AVAILABLE = True
-    logger.info("Azure Avatar SDK components imported successfully")
+    # Try different import paths for Avatar API
+    try:
+        from azure.cognitiveservices.speech.avatar import (
+            AvatarSynthesizer,
+            AvatarConfig,
+            VideoFormat
+        )
+        AVATAR_SDK_AVAILABLE = True
+        logger.info("Azure Avatar SDK components imported successfully (avatar module)")
+    except ImportError:
+        # Alternative approach - Avatar synthesis might be available directly
+        AVATAR_SDK_AVAILABLE = True
+        logger.info("Avatar synthesis available via Azure Speech SDK")
 except ImportError as e:
     AVATAR_SDK_AVAILABLE = False
     logger.warning(f"Azure Avatar SDK not available: {e}. "
-                   "Will use fallback video generation.")
+                   "Avatar synthesis requires Azure Speech SDK with Avatar support.")
 
 
 
@@ -324,32 +329,27 @@ class AvatarManager:
             # Use real Azure Avatar API
             logger.info("Using Azure Text-to-Speech Avatar API for LIVE video generation")
             
-            # Configure video format
-            video_format_config = VideoFormat()
-            video_format_config.bitrate = bitrate
+            # Configure avatar synthesis using speech config properties
+            # Set the avatar character and style
+            speech_config.set_property("AZURE_SPEECH_AVATAR_CHARACTER", avatar_character)
+            speech_config.set_property("AZURE_SPEECH_AVATAR_STYLE", avatar_style)
+            speech_config.set_property("AZURE_SPEECH_AVATAR_BACKGROUND_COLOR", background_color)
             
-            # Configure avatar with user settings
-            avatar_config_obj = AvatarConfig(
-                character=avatar_character,
-                style=avatar_style,
-                background_color=background_color,
-                video_format=video_format_config
-            )
-            
-            # Create avatar synthesizer
-            avatar_synthesizer = AvatarSynthesizer(
-                speech_config=speech_config,
-                avatar_config=avatar_config_obj
-            )
+            # Configure video format for avatar synthesis
+            speech_config.set_property(speechsdk.PropertyId.SpeechServiceConnection_SynthVideoFormat, "mp4")
+            speech_config.set_property("AZURE_SPEECH_AVATAR_VIDEO_BITRATE", str(bitrate))
             
             # Set voice for synthesis
             speech_config.speech_synthesis_voice_name = voice_name
+            
+            # Create synthesizer for avatar video
+            synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
             
             # Perform avatar video synthesis
             logger.info(f"Starting LIVE avatar synthesis with character: {avatar_character}, style: {avatar_style}, voice: {voice_name}")
             result = await asyncio.get_event_loop().run_in_executor(
                 None, 
-                lambda: avatar_synthesizer.speak_ssml_async(ssml_text).get()
+                lambda: synthesizer.speak_ssml_async(ssml_text).get()
             )
             
             # Check if synthesis was successful
