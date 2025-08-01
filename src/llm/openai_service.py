@@ -25,7 +25,8 @@ class OpenAIService:
             # Azure OpenAI configuration
             self.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
             self.api_key = os.getenv("AZURE_OPENAI_KEY") 
-            self.api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
+            self.api_version = os.getenv("AZURE_OPENAI_API_VERSION",
+                                         "2024-12-01-preview")
             
             if not self.azure_endpoint or not self.api_key:
                 raise ValueError("Azure OpenAI credentials not configured")
@@ -40,7 +41,8 @@ class OpenAIService:
             # Model deployments as specified in TDD
             self.models = {
                 'gpt4o': os.getenv("AZURE_OPENAI_GPT4O_DEPLOYMENT", "gpt-4o"),
-                'o3-mini': os.getenv("AZURE_OPENAI_O3_MINI_DEPLOYMENT", "o3-mini")
+                'o3-mini': os.getenv("AZURE_OPENAI_O3_MINI_DEPLOYMENT", 
+                                   "o3-mini")
             }
             
             logger.info(f"OpenAI Service initialized with endpoint: {self.azure_endpoint}")
