@@ -207,6 +207,66 @@ body {
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
 }
 
+/* Avatar Session Controls */
+.avatar-session-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.session-button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.start-button {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.start-button:hover:not(:disabled) {
+    background-color: #4CAF50;
+    transform: translateY(-1px);
+}
+
+.stop-button {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.stop-button:hover:not(:disabled) {
+    background-color: #FF5252;
+    transform: translateY(-1px);
+}
+
+.session-button:disabled {
+    background-color: var(--border-color);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.avatar-status {
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+
 .avatar-preview {
     padding: 15px;
     background-color: var(--background-color);

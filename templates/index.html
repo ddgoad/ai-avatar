@@ -82,6 +82,15 @@
                                 <option value="low">Low</option>
                             </select>
                         </div>
+                        
+                        <!-- Avatar Session Controls -->
+                        <div class="setting-group">
+                            <div class="avatar-session-controls">
+                                <button id="start-avatar" class="session-button start-button">Start Avatar</button>
+                                <button id="stop-avatar" class="session-button stop-button" disabled>Stop Avatar</button>
+                                <div id="avatar-status" class="avatar-status">Disconnected</div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Avatar Preview -->
@@ -164,6 +173,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/avatar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

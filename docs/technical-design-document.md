@@ -4,61 +4,93 @@
 
 This document outlines the technical design for an AI Avatar application that leverages Microsoft's Azure Text-to-Speech Avatar service to create an interactive conversational experience. The application provides a complete voice-to-video pipeline that processes user voice input, generates intelligent responses using Azure OpenAI, and presents the response through a photorealistic AI avatar.
 
+## Key Learning from Azure Official Samples
+
+Based on analysis of Azure's official samples (https://github.com/Azure-Samples/cognitive-services-speech-sdk/tree/master/samples/js/browser/avatar), the implementation approach differs significantly from initial assumptions:
+
+### Real-Time Session-Based Architecture
+- **WebRTC Real-Time Streaming**: Avatar API uses WebRTC peer connections for real-time video streaming rather than generating downloadable video files
+- **Session Management**: Uses "Start Session" → "Speak" → "Stop Session" pattern, not direct synthesis calls
+- **ICE Token Authentication**: Requires ICE server token from Azure for WebRTC connection setup
+- **Frontend-Driven**: Primary logic resides in JavaScript frontend with minimal backend avatar session management
+
+### Correct API Implementation Pattern
+1. **Frontend**: JavaScript creates WebRTC peer connection and manages avatar session
+2. **Backend**: Provides ICE tokens and handles avatar session configuration via REST endpoints
+3. **Real-Time Communication**: WebRTC streams video directly to browser, no file storage needed
+4. **Session Control**: Frontend controls start/stop of avatar sessions and speech synthesis
+
+### Updated Architecture Components
+- **JavaScript Frontend**: Manages WebRTC connections, avatar sessions, and real-time video display
+- **Python Backend**: Provides REST API for ICE tokens, session management, and OpenAI integration
+- **Azure Avatar Service**: Real-time WebRTC-based avatar synthesis (not file-based)
+- **No Video Storage**: Videos stream directly via WebRTC, eliminating need for Azure Blob Storage for avatar videos
+
 ## Architecture Overview
 
-### High-Level Flow
+### High-Level Flow (Updated Based on Azure Samples)
 ```
-┌─ User Voice Input ─┐
-│                    │
-│  ┌─ User Text ─┐   │
-│  │   Input    │   │ → Input Processing → Azure OpenAI LLM → Text-to-Speech Avatar → Video Output
-│  └────────────┘   │     (Speech-to-Text      (GPT-4o/O3-mini)      (Azure Avatar API)
-│                    │      for voice only)
-└────────────────────┘
+┌─ User Voice Input ─┐                    ┌─ WebRTC Avatar Session ─┐
+│                    │                    │                          │
+│  ┌─ User Text ─┐   │                    │  ┌─ Real-Time Video ─┐   │
+│  │   Input    │   │ → Input Processing → Azure OpenAI LLM → │     Streaming     │ → Video Display
+│  └────────────┘   │     (Speech-to-Text      (GPT-4o/O3-mini)    │   (WebRTC)      │   (Browser)
+│                    │      for voice only)                        └─────────────────┘
+└────────────────────┘                                                      ↑
+                                                                Azure Avatar Service
+                                                                (Real-time TTS + Video)
 ```
 
-### Detailed Process Flow
-1. **User Input Capture**: 
+### Detailed Process Flow (Updated)
+1. **Avatar Session Setup**: 
+   - Frontend requests ICE token from backend
+   - JavaScript establishes WebRTC peer connection with Azure Avatar Service
+   - Avatar session starts with configured character, style, and background
+2. **User Input Capture**: 
    - **Voice Input**: User speaks into the web interface (WebRTC audio capture)
    - **Text Input**: User types directly into the chat interface
-2. **Input Processing**: 
+3. **Input Processing**: 
    - **Voice**: Azure Speech Services converts audio to text
    - **Text**: Direct text input bypasses speech-to-text conversion
-3. **LLM Processing**: Text is sent to Azure OpenAI (GPT-4o or O3-mini) for intelligent response generation
-4. **Avatar Video Generation**: Response text is converted to video using Azure Text-to-Speech Avatar service
-5. **Presentation**: Generated avatar video is displayed to the user with synchronized audio
+4. **LLM Processing**: Text is sent to Azure OpenAI (GPT-4o or O3-mini) for intelligent response generation
+5. **Real-Time Avatar Speech**: Response text is sent to active avatar session for immediate speech synthesis and video generation
+6. **Live Video Streaming**: Avatar video streams in real-time via WebRTC to browser video element
 
 ## System Architecture
 
-### Architecture Diagram
+### Architecture Diagram (Updated for Real-Time WebRTC)
 
 ```mermaid
 graph TB
-    subgraph "User Interface Layer"
+    subgraph "Frontend (JavaScript)"
         UI[Web Browser]
         VI[Voice Input]
         TI[Text Input]
         MS[Model Selector]
-        AV[Avatar Video Display]
+        WRT[WebRTC Manager]
+        AVS[Avatar Session]
+        VD[Video Display]
         CH[Chat History]
     end
     
-    subgraph "Flask Application Layer"
+    subgraph "Backend (Python Flask)"
         Auth[Authentication Module]
         API[Flask API Routes]
+        ICE[ICE Token Provider]
         Session[Session Management]
     end
     
     subgraph "Business Logic Layer"
         Speech[Speech Processing]
         OpenAI[OpenAI Integration]
-        Avatar[Avatar Manager]
+        Avatar[Avatar Session Manager]
         Cache[Response Cache]
     end
     
     subgraph "Azure Services"
         STT[Speech-to-Text API]
-        TTS[Text-to-Speech Avatar API]
+        AvatarAPI[Avatar WebRTC Service]
+        ICETok[Avatar ICE Token Service]
         GPT4[GPT-4o Deployment]
         O3[O3-mini Deployment]
         KV[Key Vault]
@@ -72,31 +104,38 @@ graph TB
         Monitor[Azure Monitor]
     end
     
-    %% User Interface Connections
+    %% Frontend Connections
     UI --> VI
     UI --> TI
     UI --> MS
-    UI --> AV
+    UI --> WRT
+    UI --> VD
     UI --> CH
+    WRT --> AVS
     
-    %% Input Processing Flow
+    %% Frontend to Backend
     VI --> Auth
     TI --> Auth
     MS --> Auth
+    WRT --> ICE
     Auth --> API
     
-    %% API Processing
+    %% Backend Processing
     API --> Speech
     API --> OpenAI
     API --> Avatar
     API --> Session
+    ICE --> ICETok
+    
+    %% Real-Time WebRTC Connection
+    AVS -.->|WebRTC Stream| AvatarAPI
+    VD -.->|Real-time Video| AvatarAPI
     
     %% Business Logic to Azure Services
     Speech --> STT
-    Speech --> TTS
     OpenAI --> GPT4
     OpenAI --> O3
-    Avatar --> TTS
+    Avatar --> AvatarAPI
     Cache --> Storage
     
     %% Security and Configuration

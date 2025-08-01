@@ -287,50 +287,22 @@ class ChatInterface {
                 // Add AI response to chat
                 this.addMessageToChat('assistant', response.text, 'text');
                 
-                // Play avatar video if available
-                if (response.video_url) {
-                    console.log('Playing avatar video for response:', response.video_url);
-                    
-                    // For Azure Blob Storage URLs, use direct method first since they're public
-                    if (response.video_url.includes('blob.core.windows.net')) {
-                        try {
-                            console.log('Using direct URL method for Azure Blob Storage...');
-                            await this.avatarPlayer.playVideoDirectly(response.video_url);
-                            console.log('Direct video playback succeeded');
-                        } catch (directError) {
-                            console.error('Direct video playback failed:', directError);
-                            
-                            // Fallback to fetch method
-                            try {
-                                console.log('Attempting fetch method as fallback...');
-                                await this.avatarPlayer.playAvatarVideo(response.video_url);
-                                console.log('Fetch method succeeded');
-                            } catch (fetchError) {
-                                console.error('Both video methods failed:', fetchError);
-                                this.showError(`Video playback failed: ${directError.message}. Please try refreshing the page. The text response is available above.`);
-                            }
-                        }
-                    } else {
-                        // For other URLs, use fetch method first
-                        try {
-                            await this.avatarPlayer.playAvatarVideo(response.video_url);
-                            console.log('Avatar video played successfully');
-                        } catch (videoError) {
-                            console.error('Primary video playback failed:', videoError);
-                            
-                            // Try fallback method - direct video URL assignment
-                            try {
-                                console.log('Attempting fallback video loading method...');
-                                await this.avatarPlayer.playVideoDirectly(response.video_url);
-                                console.log('Fallback video playback succeeded');
-                            } catch (fallbackError) {
-                                console.error('Fallback video playback also failed:', fallbackError);
-                                this.showError(`Video playback failed: ${videoError.message}. Please try refreshing the page. The text response is available above.`);
-                            }
-                        }
+                // Use avatar to speak the response if connected
+                if (this.avatarPlayer.isConnected) {
+                    console.log('Speaking response through WebRTC avatar');
+                    try {
+                        await this.avatarPlayer.speakText(response.text);
+                        console.log('Avatar speech completed successfully');
+                    } catch (speechError) {
+                        console.error('Avatar speech failed:', speechError);
+                        this.showError(`Avatar speech failed: ${speechError.message}. The text response is available above.`);
                     }
                 } else {
-                    console.log('No video URL in response');
+                    console.log('Avatar not connected, skipping speech synthesis');
+                    // Optionally show a message that avatar needs to be started
+                    if (response.video_url) {
+                        this.showError('Avatar is not connected. Please start the avatar session to see animated responses.');
+                    }
                 }
                 
                 // Update conversation history - use the transcribed text for voice input
@@ -608,15 +580,30 @@ class AvatarPlayer {
     constructor(videoElement) {
         this.video = videoElement;
         this.currentVideoUrl = null;
+        this.avatarManager = null;
+        this.isConnected = false;
         
         if (this.video) {
             this.setupEventListeners();
         }
         
-        console.log('AvatarPlayer initialized');
+        console.log('AvatarPlayer initialized with WebRTC support');
     }
     
     setupEventListeners() {
+        // Setup avatar session controls
+        const startButton = document.getElementById('start-avatar');
+        const stopButton = document.getElementById('stop-avatar');
+        
+        if (startButton) {
+            startButton.addEventListener('click', () => this.startAvatarSession());
+        }
+        
+        if (stopButton) {
+            stopButton.addEventListener('click', () => this.stopAvatarSession());
+        }
+        
+        // Keep legacy video event listeners for backward compatibility
         this.video.addEventListener('loadstart', () => {
             this.showVideoLoading(true);
         });
@@ -635,12 +622,136 @@ class AvatarPlayer {
         });
     }
     
-    async playAvatarVideo(videoUrl) {
+    async startAvatarSession() {
+        try {
+            this.updateSessionStatus('Connecting...');
+            this.updateSessionButtons(false, false);
+            
+            // Create avatar manager if not exists
+            if (!this.avatarManager) {
+                this.avatarManager = new AvatarManager();
+            }
+            
+            // Get avatar configuration from UI
+            const config = this.getAvatarConfig();
+            
+            // Connect to avatar session
+            await this.avatarManager.connectAvatar(this.video, config);
+            
+            this.isConnected = true;
+            this.updateSessionStatus('Connected');
+            this.updateSessionButtons(false, true);
+            
+            console.log('Avatar session started successfully');
+            
+        } catch (error) {
+            console.error('Failed to start avatar session:', error);
+            this.updateSessionStatus('Connection Failed');
+            this.updateSessionButtons(true, false);
+            this.showError('Failed to start avatar session: ' + error.message);
+        }
+    }
+    
+    async stopAvatarSession() {
+        try {
+            this.updateSessionStatus('Disconnecting...');
+            
+            if (this.avatarManager) {
+                await this.avatarManager.disconnect();
+            }
+            
+            this.isConnected = false;
+            this.updateSessionStatus('Disconnected');
+            this.updateSessionButtons(true, false);
+            
+            // Clear video source
+            if (this.video) {
+                this.video.srcObject = null;
+            }
+            
+            console.log('Avatar session stopped');
+            
+        } catch (error) {
+            console.error('Failed to stop avatar session:', error);
+            this.updateSessionStatus('Disconnect Failed');
+            this.showError('Failed to stop avatar session: ' + error.message);
+        }
+    }
+    
+    async speakText(text) {
+        if (!this.isConnected || !this.avatarManager) {
+            console.warn('Avatar not connected, cannot speak text');
+            return false;
+        }
+        
+        try {
+            await this.avatarManager.speak(text);
+            return true;
+        } catch (error) {
+            console.error('Failed to speak text:', error);
+            this.showError('Failed to speak text: ' + error.message);
+            return false;
+        }
+    }
+    
+    getAvatarConfig() {
+        return {
+            character: document.getElementById('avatar-character')?.value || 'lisa',
+            style: document.getElementById('avatar-style')?.value || 'graceful-sitting',
+            voice: document.getElementById('avatar-voice')?.value || 'en-US-JennyNeural',
+            background: document.getElementById('avatar-background')?.value || 'solid-white',
+            quality: document.getElementById('video-quality')?.value || 'high'
+        };
+    }
+    
+    updateSessionStatus(status) {
+        const statusElement = document.getElementById('avatar-status');
+        if (statusElement) {
+            statusElement.textContent = status;
+            statusElement.className = `avatar-status ${status.toLowerCase().replace(/\s+/g, '-')}`;
+        }
+    }
+    
+    updateSessionButtons(startEnabled, stopEnabled) {
+        const startButton = document.getElementById('start-avatar');
+        const stopButton = document.getElementById('stop-avatar');
+        
+        if (startButton) {
+            startButton.disabled = !startEnabled;
+        }
+        
+        if (stopButton) {
+            stopButton.disabled = !stopEnabled;
+        }
+    }
+    
+    showError(message) {
+        const errorElement = document.getElementById('error-message');
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        console.error(message);
+    }
+    
+    async playAvatarVideo(textOrVideoUrl) {
+        // For WebRTC mode, treat parameter as text to speak
+        if (this.isConnected && this.avatarManager) {
+            console.log('WebRTC avatar is connected, using speech synthesis instead of video playback');
+            return await this.speakText(textOrVideoUrl);
+        }
+        
+        // Legacy video playback mode (fallback)
         if (!this.video) return;
         
         try {
             this.showVideoLoading(true);
-            console.log('Loading avatar video from:', videoUrl);
+            console.log('Loading avatar video from:', textOrVideoUrl);
             
             // Clean up previous video URL
             if (this.currentVideoUrl) {
@@ -649,7 +760,7 @@ class AvatarPlayer {
             }
             
             // Simplified approach - let browser handle redirects naturally
-            const response = await fetch(videoUrl, {
+            const response = await fetch(textOrVideoUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'video/mp4, video/*, */*'
@@ -767,8 +878,15 @@ class AvatarPlayer {
         }
     }
     
-    async playVideoDirectly(videoUrl) {
-        console.log('Attempting direct video URL assignment:', videoUrl);
+    async playVideoDirectly(textOrVideoUrl) {
+        // For WebRTC mode, treat parameter as text to speak
+        if (this.isConnected && this.avatarManager) {
+            console.log('WebRTC avatar is connected, using speech synthesis instead of direct video playback');
+            return await this.speakText(textOrVideoUrl);
+        }
+        
+        // Legacy video playback mode (fallback)
+        console.log('Attempting direct video URL assignment:', textOrVideoUrl);
         
         return new Promise((resolve, reject) => {
             this.showVideoLoading(true);
@@ -780,7 +898,7 @@ class AvatarPlayer {
             }
             
             // Directly assign the URL to the video element
-            this.video.src = videoUrl;
+            this.video.src = textOrVideoUrl;
             
             let hasResolved = false;
             
