@@ -66,23 +66,22 @@
         <h2>Avatar Configuration</h2>
         <div class="config-section">
             <label for="talkingAvatarCharacter">Avatar Character:</label>
-            <select id="talkingAvatarCharacter">
-                <option value="lisa">Lisa</option>
-                <option value="anna">Anna</option>
-                <option value="tony">Tony</option>
-                <option value="mike">Mike</option>
-                <option value="emma">Emma</option>
-                <option value="sara">Sara</option>
+            <select id="talkingAvatarCharacter" onchange="updateAvailableStyles()">
+                <option value="lisa">Lisa (Professional Female)</option>
+                <option value="harry">Harry (Professional Male)</option>
+                <option value="jeff">Jeff (Business Male)</option>
+                <option value="lori">Lori (Friendly Female)</option>
+                <option value="meg">Meg (Professional Female)</option>
+                <option value="max">Max (Business Male)</option>
             </select>
             
             <label for="talkingAvatarStyle">Avatar Style:</label>
             <select id="talkingAvatarStyle">
                 <option value="casual-sitting">Casual Sitting</option>
-                <option value="graceful-sitting">Graceful Sitting</option>
-                <option value="casual-standing">Casual Standing</option>
-                <option value="graceful-standing">Graceful Standing</option>
-                <option value="business-sitting">Business Sitting</option>
-                <option value="business-standing">Business Standing</option>
+                <option value="business">Business</option>
+                <option value="casual">Casual</option>
+                <option value="formal">Formal</option>
+                <option value="youthful">Youthful</option>
             </select>
             
             <div>
@@ -176,7 +175,7 @@
                     document.getElementById('azureOpenAIDeploymentName').value = 'gpt-4o';
                     document.getElementById('ttsVoice').value = 'en-AU-NatashaNeural';
                     document.getElementById('talkingAvatarCharacter').value = 'lisa';
-                    document.getElementById('talkingAvatarStyle').value = 'casual-sitting';
+                    document.getElementById('talkingAvatarStyle').value = 'graceful-sitting';
                     
                 } else {
                     console.error('Failed to load server configuration:', response.status);
@@ -205,6 +204,55 @@
                     window.location.href = '/login';
                 }
             });
+            
+            // Character/Style compatibility matrix for real-time synthesis
+            window.characterStyleMatrix = {
+                'lisa': ['casual-sitting'],  // Only casual-sitting for real-time
+                'harry': ['business', 'casual', 'youthful'],
+                'jeff': ['business', 'formal'],
+                'lori': ['casual', 'formal'],
+                'meg': ['formal', 'casual', 'business'],
+                'max': ['business', 'casual', 'formal']
+            };
+            
+            // Function to update available styles based on selected character
+            window.updateAvailableStyles = function() {
+                const characterSelect = document.getElementById('talkingAvatarCharacter');
+                const styleSelect = document.getElementById('talkingAvatarStyle');
+                const selectedCharacter = characterSelect.value;
+                
+                // Clear existing options
+                styleSelect.innerHTML = '';
+                
+                // Get supported styles for the selected character
+                const supportedStyles = window.characterStyleMatrix[selectedCharacter] || [];
+                
+                // Add compatible style options
+                const styleOptions = {
+                    'casual-sitting': 'Casual Sitting',
+                    'business': 'Business',
+                    'casual': 'Casual',
+                    'formal': 'Formal',
+                    'youthful': 'Youthful'
+                };
+                
+                supportedStyles.forEach(styleId => {
+                    if (styleOptions[styleId]) {
+                        const option = document.createElement('option');
+                        option.value = styleId;
+                        option.textContent = styleOptions[styleId];
+                        styleSelect.appendChild(option);
+                    }
+                });
+                
+                // Select the first available style
+                if (supportedStyles.length > 0) {
+                    styleSelect.value = supportedStyles[0];
+                }
+            };
+            
+            // Initialize styles for default character on page load
+            window.updateAvailableStyles();
             
             // Debug function to check Azure config status
             window.debugAzureConfig = () => {

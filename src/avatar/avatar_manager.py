@@ -27,22 +27,49 @@ class AvatarManager:
     def __init__(self):
         """Initialize Avatar Manager for real-time sessions"""
         
-        # Available characters as specified in TDD
+        # Available characters as per Azure Speech SDK official documentation
+        # Reference: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/avatar-gestures-with-ssml#supported-standard-avatar-characters-styles-and-gestures
         self.available_characters = [
-            {'id': 'lisa', 'name': 'Lisa', 'description': 'Professional female avatar'},
-            {'id': 'mark', 'name': 'Mark', 'description': 'Professional male avatar'},
-            {'id': 'anna', 'name': 'Anna', 'description': 'Casual female avatar'},
-            {'id': 'jenny', 'name': 'Jenny', 'description': 'Friendly female avatar'},
-            {'id': 'ryan', 'name': 'Ryan', 'description': 'Young male avatar'}
+            {'id': 'lisa', 'name': 'Lisa', 
+             'description': 'Professional female avatar'},
+            {'id': 'harry', 'name': 'Harry', 
+             'description': 'Professional male avatar'},
+            {'id': 'jeff', 'name': 'Jeff', 
+             'description': 'Business male avatar'},
+            {'id': 'lori', 'name': 'Lori', 
+             'description': 'Friendly female avatar'},
+            {'id': 'meg', 'name': 'Meg', 
+             'description': 'Professional female avatar'},
+            {'id': 'max', 'name': 'Max', 
+             'description': 'Business male avatar'}
         ]
         
-        # Available styles as specified in TDD
+        # Available styles as per Azure Speech SDK official documentation
+        # Note: For real-time synthesis, Lisa only supports 'casual-sitting'
+        # All other Lisa styles are NOT supported for real-time API
         self.available_styles = [
-            {'id': 'graceful-sitting', 'name': 'Graceful Sitting', 'description': 'Elegant seated pose'},
-            {'id': 'standing', 'name': 'Standing', 'description': 'Professional standing pose'},
-            {'id': 'casual', 'name': 'Casual', 'description': 'Relaxed casual pose'},
-            {'id': 'professional', 'name': 'Professional', 'description': 'Business professional pose'}
+            {'id': 'casual-sitting', 'name': 'Casual Sitting', 
+             'description': 'Relaxed seated pose (Lisa only)'},
+            {'id': 'business', 'name': 'Business', 
+             'description': 'Professional business style'},
+            {'id': 'casual', 'name': 'Casual', 
+             'description': 'Relaxed casual style'},
+            {'id': 'formal', 'name': 'Formal', 
+             'description': 'Formal professional style'},
+            {'id': 'youthful', 'name': 'Youthful', 
+             'description': 'Young energetic style'}
         ]
+        
+        # Character/Style compatibility matrix for real-time synthesis
+        # Based on Azure documentation - real-time API limitations
+        self.character_style_matrix = {
+            'lisa': ['casual-sitting'],  # Only casual-sitting for real-time
+            'harry': ['business', 'casual', 'youthful'],
+            'jeff': ['business', 'formal'],
+            'lori': ['casual', 'formal'],  # graceful not in real-time
+            'meg': ['formal', 'casual', 'business'],
+            'max': ['business', 'casual', 'formal']
+        }
         
         # Available voices with filtering as specified in TDD
         self.available_voices = [
@@ -88,7 +115,7 @@ class AvatarManager:
         # Default configuration as specified in TDD
         self.default_config = {
             'character': 'lisa',
-            'style': 'graceful-sitting',
+            'style': 'casual-sitting',  # Only style supported for Lisa in real-time
             'voice': 'en-US-JennyNeural',
             'background': 'solid-white',
             'gesture': None,

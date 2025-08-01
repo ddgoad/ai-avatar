@@ -33,6 +33,8 @@ function connectAvatar() {
         return
     }
     
+    console.log(`[${(new Date()).toISOString()}] Starting avatar connection. isReconnecting=${isReconnecting}, sessionActive=${sessionActive}, userClosedSession=${userClosedSession}`)
+    
     if (isReconnecting && !userClosedSession) {
         // Allow reconnection attempts
         console.log('Attempting to reconnect avatar session...')
@@ -147,12 +149,18 @@ function connectAvatar() {
                     alert('Failed to initialize avatar connection. Please try again.')
                     document.getElementById('startSession').disabled = false
                     document.getElementById('configuration').hidden = false
+                    // Reset reconnection state on failure
+                    isReconnecting = false
+                    sessionActive = false
                 }
             } else {
                 console.error('Avatar token request failed:', this.status, this.responseText)
                 alert('Failed to get avatar connection token. Please check your Azure Speech credentials.')
                 document.getElementById('startSession').disabled = false
                 document.getElementById('configuration').hidden = false
+                // Reset reconnection state on failure
+                isReconnecting = false
+                sessionActive = false
             }
         }
     })
@@ -161,6 +169,9 @@ function connectAvatar() {
         alert('Network error during avatar connection. Please check your internet connection.')
         document.getElementById('startSession').disabled = false
         document.getElementById('configuration').hidden = false
+        // Reset reconnection state on failure
+        isReconnecting = false
+        sessionActive = false
     }
     xhr.send()
 }
@@ -298,7 +309,10 @@ function setupWebRTC(iceServerUrl, iceServerUsername, iceServerCredential) {
                 }
 
                 isReconnecting = false
-                setTimeout(() => { sessionActive = true }, 5000) // Set session active after 5 seconds
+                setTimeout(() => { 
+                    console.log(`[${(new Date()).toISOString()}] Setting session active after avatar initialization`)
+                    sessionActive = true 
+                }, 3000) // Reduced timeout and added logging
             }
         }
     }
@@ -806,9 +820,13 @@ function checkLastSpeak() {
 function handleAvatarConfigChange(configType) {
     console.log(`[${(new Date()).toISOString()}] Avatar ${configType} configuration changed`)
     
-    // Only restart if session is currently active and not already reconnecting
-    if (sessionActive && !isReconnecting && !userClosedSession) {
+    // Check if avatar is initializing, active, or recently connected
+    const isAvatarConnected = sessionActive || peerConnection !== undefined || avatarSynthesizer !== undefined
+    
+    // Only restart if there's an active connection and not already reconnecting
+    if (isAvatarConnected && !isReconnecting && !userClosedSession) {
         console.log(`[${(new Date()).toISOString()}] Restarting avatar session due to ${configType} change...`)
+        console.log(`[${(new Date()).toISOString()}] State: sessionActive=${sessionActive}, peerConnection=${peerConnection !== undefined}, avatarSynthesizer=${avatarSynthesizer !== undefined}`)
         
         // Stop any current speaking
         if (isSpeaking) {
@@ -818,19 +836,30 @@ function handleAvatarConfigChange(configType) {
         // Mark as reconnecting to prevent duplicate restarts
         isReconnecting = true
         
+        // Forcefully reset session state to prevent conflicts
+        sessionActive = false
+        
         // Manually disconnect current session without resetting isReconnecting flag
         console.log('[' + (new Date()).toISOString() + '] Disconnecting avatar session for config change...')
         
         // Close avatar synthesizer
         if (avatarSynthesizer !== undefined) {
-            avatarSynthesizer.close()
+            try {
+                avatarSynthesizer.close()
+            } catch (e) {
+                console.log('Error closing avatar synthesizer:', e)
+            }
             avatarSynthesizer = undefined
         }
 
         // Close speech recognizer
         if (speechRecognizer !== undefined) {
-            speechRecognizer.stopContinuousRecognitionAsync()
-            speechRecognizer.close()
+            try {
+                speechRecognizer.stopContinuousRecognitionAsync()
+                speechRecognizer.close()
+            } catch (e) {
+                console.log('Error closing speech recognizer:', e)
+            }
             speechRecognizer = undefined
         }
 
@@ -838,56 +867,69 @@ function handleAvatarConfigChange(configType) {
         if (peerConnection !== undefined) {
             console.log('[' + (new Date()).toISOString() + '] Closing WebRTC peer connection...')
             
-            // Remove all event listeners before closing
-            peerConnection.ontrack = null
-            peerConnection.oniceconnectionstatechange = null
-            
-            // Close the connection
-            peerConnection.close()
+            try {
+                // Remove all event listeners before closing
+                peerConnection.ontrack = null
+                peerConnection.oniceconnectionstatechange = null
+                
+                // Close the connection
+                peerConnection.close()
+            } catch (e) {
+                console.log('Error closing peer connection:', e)
+            }
             peerConnection = undefined
         }
 
         // Clear data channel and remove event listeners
         if (peerConnectionDataChannel !== undefined) {
-            peerConnectionDataChannel.onmessage = null
+            try {
+                peerConnectionDataChannel.onmessage = null
+            } catch (e) {
+                console.log('Error clearing data channel:', e)
+            }
             peerConnectionDataChannel = undefined
         }
 
         // Reset session state but keep isReconnecting = true
-        sessionActive = false
         isSpeaking = false
         
         // Clear video and audio elements completely
         const remoteVideoDiv = document.getElementById('remoteVideo')
         if (remoteVideoDiv) {
-            // Stop any playing media before clearing
-            const videoElement = remoteVideoDiv.querySelector('video')
-            const audioElement = remoteVideoDiv.querySelector('audio')
-            
-            if (videoElement) {
-                videoElement.pause()
-                videoElement.srcObject = null
-                videoElement.removeAttribute('src')
+            try {
+                // Stop any playing media before clearing
+                const videoElement = remoteVideoDiv.querySelector('video')
+                const audioElement = remoteVideoDiv.querySelector('audio')
+                
+                if (videoElement) {
+                    videoElement.pause()
+                    videoElement.srcObject = null
+                    videoElement.removeAttribute('src')
+                    videoElement.load() // Force reload to clear resources
+                }
+                
+                if (audioElement) {
+                    audioElement.pause()
+                    audioElement.srcObject = null
+                    audioElement.removeAttribute('src')
+                    audioElement.load() // Force reload to clear resources
+                }
+                
+                // Clear all child elements
+                remoteVideoDiv.innerHTML = ''
+                remoteVideoDiv.style.width = '0.1px'
+            } catch (e) {
+                console.log('Error clearing video elements:', e)
             }
-            
-            if (audioElement) {
-                audioElement.pause()
-                audioElement.srcObject = null
-                audioElement.removeAttribute('src')
-            }
-            
-            // Clear all child elements
-            remoteVideoDiv.innerHTML = ''
-            remoteVideoDiv.style.width = '0.1px'
         }
         
         // Brief delay to ensure cleanup completes before reconnecting
         setTimeout(() => {
             console.log(`[${(new Date()).toISOString()}] Reconnecting with new ${configType} configuration...`)
             connectAvatar()
-        }, 1500)
+        }, 2000) // Increased delay to 2 seconds
     } else {
-        console.log(`[${(new Date()).toISOString()}] Avatar ${configType} change ignored - session not active or already reconnecting`)
+        console.log(`[${(new Date()).toISOString()}] Avatar ${configType} change ignored - no active connection (sessionActive=${sessionActive}, peerConnection=${peerConnection !== undefined}, avatarSynthesizer=${avatarSynthesizer !== undefined}) or already reconnecting (${isReconnecting}) or user closed (${userClosedSession})`)
     }
 }
 
